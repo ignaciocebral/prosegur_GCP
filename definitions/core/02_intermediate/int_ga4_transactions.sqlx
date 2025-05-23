@@ -81,6 +81,7 @@ step1 as (
             ecommerce.purchase_revenue,
             ecommerce.shipping_value_in_usd,
             ecommerce.shipping_value,
+            ecommerce.shipping_tier,
             ecommerce.tax_value_in_usd,
             ecommerce.tax_value,
             ecommerce.unique_items,
