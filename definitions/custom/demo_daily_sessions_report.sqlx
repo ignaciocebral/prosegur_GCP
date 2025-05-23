@@ -62,6 +62,7 @@ with sessions_aggregation as (
         countif(e.event_name = 'view_item') as view_item,
         countif(e.event_name = 'add_to_cart') as add_to_cart,
         countif(e.event_name = 'begin_checkout') as begin_checkout,
+        countif(e.event_name = 'add_shipping_info') as add_shipping_info,
         countif(e.event_name = 'purchase') as purchase,
         countif(e.event_name = 'view_search_results') as view_search_results,
         sum(e.ecommerce.purchase_revenue) as revenue,
@@ -74,6 +75,7 @@ with sessions_aggregation as (
         'page_view',
         'view_item',
         'add_to_cart',
+        'add_shipping_info',
         'begin_checkout',
         'purchase',
         'view_search_results'
@@ -120,6 +122,7 @@ daily_aggregation as (
         sum(revenue) as revenue,
         sum(page_view) as page_view,
         sum(view_item) as view_item,
+        sum(add_shipping_info) as add_shipping_info,
         sum(add_to_cart) as add_to_cart,
         sum(begin_checkout) as  begin_checkout,
         sum(purchase) as purchase,
@@ -127,6 +130,7 @@ daily_aggregation as (
 
         count(distinct if(view_item > 0, session_id, null)) as view_item_sessions,
         count(distinct if(add_to_cart > 0, session_id, null)) as add_to_cart_sessions,
+        count(distinct if(add_shipping_info > 0, session_id, null)) as add_shipping_info_sessions,
         count(distinct if(begin_checkout > 0, session_id, null)) as  begin_checkout_sessions,
         count(distinct if(purchase > 0, session_id, null)) as purchase_sessions,
         count(distinct transaction_id) as transactions
