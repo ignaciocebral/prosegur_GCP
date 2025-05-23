@@ -372,7 +372,6 @@ step2 as (
     -- also remove NANs in ecommerce struct
     struct(
         ecommerce.total_item_quantity,
-        ecommerce.shipping_tier,
         if(is_nan(ecommerce.purchase_revenue_in_usd), 0,ecommerce.purchase_revenue_in_usd) as purchase_revenue_in_usd,
         if(is_nan(ecommerce.purchase_revenue), 0,ecommerce.purchase_revenue) as purchase_revenue,
         if(is_nan(ecommerce.refund_value_in_usd), 0,ecommerce.refund_value_in_usd) as refund_value_in_usd,
