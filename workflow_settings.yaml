@@ -1,0 +1,15 @@
+defaultAssertionDataset: superform_assertion_389069484
+defaultDataset: superform_outputs_389069484
+defaultLocation: EU
+defaultProject: spring-line-421422
+vars:
+  GA4_DATASET: analytics_389069484
+  LABEL_EXECUTION_OPERATION: daily_workflow
+  LABEL_GENERIC_BRAND: superformlabs
+  LABEL_GENERIC_LICENSE_TYPE: core
+  LABEL_GENERIC_PACKAGE_VERSION: v1-17-0
+  LABEL_GENERIC_TOOL: ga4dataform
+  LOCAL_TIMEZONE: Europe/Brussels
+  OUTPUTS_DATASET: superform_outputs_389069484
+  QUALITY_DATASET: superform_quality_389069484
+  TRANSFORMATIONS_DATASET: superform_transformations_389069484
