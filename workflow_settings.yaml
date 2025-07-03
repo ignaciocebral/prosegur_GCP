@@ -1,10 +1,9 @@
 # This file contains settings for all workflow configurations.
 # It replaces the deprecated dataform.json.
 
-warehouse: bigquery
 defaultProject: spring-line-421422
 defaultLocation: europe-west1
-assertionDataset: superform_assertions
+defaultAssertionDataset: superform_assertions
 
 # Global variables applicable to all workflows unless overridden.
 vars:
@@ -15,7 +14,7 @@ vars:
   LABEL_GENERIC_TOOL: "ga4dataform"
 
 # Defines different workflow configurations (e.g., for development, production per country).
-workflowConfigs:
+
   # Development environment configuration
   development:
     vars:
