@@ -1,13 +1,16 @@
 # === workflow_settings.yaml ===
 dataformCoreVersion: 3.0.2          # Ajusta si usas otra versión
-defaultProject: spring-line-421422
+defaultProject: pga-data-b2b-marketing-dev
 defaultLocation: europe-west1
 defaultDataset: analytics_297430230 # Solo un valor por defecto
 defaultAssertionDataset: superform_assertions
 
+
 vars: # Variables que variarás por país/entorno
   GA4_DATASET:           analytics_297430230   # Paraguay por defecto
-  OUTPUTS_DATASET:       Data_Paraguay_Processed
-  TRANSFORMATIONS_DATASET: Data_Paraguay_Processed_transformations
-  QUALITY_DATASET:       Data_Paraguay_Processed_quality
+  OUTPUTS_DATASET:       Data_Paraguay_Processed_Dataform
+  TRANSFORMATIONS_DATASET: Data_Paraguay_Processed_Dataform_transformations
+  QUALITY_DATASET:       Data_Paraguay_Processed_Dataform_quality
   LOCAL_TIMEZONE:        America/Asuncion
+  LABEL_GENERIC_BRAND: "prosegur"
+  LABEL_EXECUTION_OPERATION: "manual_workflow"
