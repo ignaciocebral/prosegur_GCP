@@ -59,6 +59,8 @@ with sessions_aggregation as (
         e.ecommerce.transaction_id as transaction_id,
 
         -- eventos de conversión “flexibles”
+        countif(e.event_name = 'page_view') as page_view,
+        countif(e.event_name = 'view_search_results') as view_search_results,
         countif(
           regexp_contains(lower(e.event_name), r"cmb")
         ) as cmb,
@@ -123,25 +125,13 @@ daily_aggregation as (
         count(distinct session_id) as sessions,
         count(distinct if(is_engaged_session, session_id, null)) as engaged_sessions,
         
-        sum(revenue) as revenue,
+
         sum(page_view) as page_view,
-        sum(view_item) as view_item,
-        sum(add_shipping_info) as add_shipping_info,
-        sum(add_to_cart) as add_to_cart,
-        sum(begin_checkout) as  begin_checkout,
-        sum(purchase) as purchase,
         sum(view_search_results) as view_search_results,
         sum(cmb) as cmb,
         sum(form) as form,
         sum(generate_lead) as generate_lead,
         sum(c2c) as c2c,
-
-        count(distinct if(view_item > 0, session_id, null)) as view_item_sessions,
-        count(distinct if(add_to_cart > 0, session_id, null)) as add_to_cart_sessions,
-        count(distinct if(add_shipping_info > 0, session_id, null)) as add_shipping_info_sessions,
-        count(distinct if(begin_checkout > 0, session_id, null)) as  begin_checkout_sessions,
-        count(distinct if(purchase > 0, session_id, null)) as purchase_sessions,
-        count(distinct transaction_id) as transactions
 
     from sessions_aggregation
     group by all
