@@ -58,28 +58,32 @@ with sessions_aggregation as (
         s.exit_page.exit_page_path,
         e.ecommerce.transaction_id as transaction_id,
 
-        countif(e.event_name = 'page_view') as page_view,
-        countif(e.event_name = 'view_item') as view_item,
-        countif(e.event_name = 'add_to_cart') as add_to_cart,
-        countif(e.event_name = 'begin_checkout') as begin_checkout,
-        countif(e.event_name = 'add_shipping_info') as add_shipping_info,
-        countif(e.event_name = 'purchase') as purchase,
-        countif(e.event_name = 'view_search_results') as view_search_results,
+        -- eventos de conversión “flexibles”
+        countif(
+          regexp_contains(lower(e.event_name), r"cmb")
+        ) as cmb,
+
+        countif(
+          regexp_contains(lower(e.event_name), r"form")           -- contiene “form”
+          and not regexp_contains(lower(e.event_name), r"formulario") -- …pero no “formulario”
+        ) as form,
+
+        countif(
+          regexp_contains(lower(e.event_name), r"c2c")
+        ) as c2c,
+
+        countif(e.event_name = 'generate_lead') as generate_lead,
         sum(e.ecommerce.purchase_revenue) as revenue,
      
     
     from ${ref("ga4_sessions")} s
     left join ${ref("ga4_events")} e
         on s.session_id = e.session_id
-        and e.event_name in (
-        'page_view',
-        'view_item',
-        'add_to_cart',
-        'add_shipping_info',
-        'begin_checkout',
-        'purchase',
-        'view_search_results'
-        )
+        and (
+    -- filtro solo para acelerar la join; usa los mismos predicados
+    regexp_contains(lower(e.event_name), r"(page_view|view_item|add_to_cart|begin_checkout|purchase|view_search_results|cmb|form|c2c)")
+    and not regexp_contains(lower(e.event_name), r"formulario")
+  )
     group by all
 
 
@@ -127,6 +131,10 @@ daily_aggregation as (
         sum(begin_checkout) as  begin_checkout,
         sum(purchase) as purchase,
         sum(view_search_results) as view_search_results,
+        sum(cmb) as cmb,
+        sum(form) as form,
+        sum(generate_lead) as generate_lead,
+        sum(c2c) as c2c,
 
         count(distinct if(view_item > 0, session_id, null)) as view_item_sessions,
         count(distinct if(add_to_cart > 0, session_id, null)) as add_to_cart_sessions,
