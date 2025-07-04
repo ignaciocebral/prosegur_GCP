@@ -1,15 +1,15 @@
 # === workflow_settings.yaml ===
-defaultProject: pga-data-b2b-marketing-dev
-defaultLocation: europe-west1
-defaultDataset: analytics_297430230 # Solo un valor por defecto
+defaultProject: spring-line-421422
+defaultLocation: EU
+defaultDataset: analytics_389069484  # Solo un valor por defecto
 defaultAssertionDataset: superform_assertions
 
 
 vars: # Variables que variarás por país/entorno
-  GA4_DATASET:           analytics_297430230   # Paraguay por defecto
-  OUTPUTS_DATASET:       Data_Paraguay_Processed_Dataform
-  TRANSFORMATIONS_DATASET: Data_Paraguay_Processed_Dataform_transformations
-  QUALITY_DATASET:       Data_Paraguay_Processed_Dataform_quality
-  LOCAL_TIMEZONE:        America/Asuncion
-  LABEL_GENERIC_BRAND: "prosegur"
+  GA4_DATASET:           analytics_389069484  # Paraguay por defecto
+  OUTPUTS_DATASET:       superform_outputs_389069484
+  TRANSFORMATIONS_DATASET: superform_transformations_389069484
+  QUALITY_DATASET:       superform_quality_389069484
+  LOCAL_TIMEZONE:        Australia/Perth
+  LABEL_GENERIC_BRAND:   change_group_AU
   LABEL_EXECUTION_OPERATION: "manual_workflow"
