@@ -1,6 +1,6 @@
 # === workflow_settings.yaml ===
-defaultProject: spring-line-421422
-defaultLocation: EU
+defaultProject: pga-data-b2b-marketing-dev
+defaultLocation: europe-west1
 defaultDataset: analytics_389069484  # Solo un valor por defecto
 defaultAssertionDataset: superform_assertions
 
