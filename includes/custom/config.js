@@ -65,7 +65,10 @@ const customConfig = {
   //    { name: "event_value", type: "decimal" },
   //    { name: "event_value", type: "string", renameTo: "event_value_string" }
   // ],
-  CUSTOM_EVENT_PARAMS_ARRAY: [],
+  CUSTOM_EVENT_PARAMS_ARRAY: [
+    {name: "id_lead", renameTo: "IdLead", type: "string", description: "ID Lead generated when a user submits a form. Unique Lead identifier in the CRM" },
+    {name: "business_type", renameTo: "BusinessType", type: "string", description: "Content about the Business Unit" }
+  ],
 
   // user properties
   // example:
@@ -93,11 +96,15 @@ const customConfig = {
   //      { name: "s", cleaningMethod: lowerSQL },
   //      { name: "search",cleaningMethod: lowerSQL }
   //   ],
-  CUSTOM_URL_PARAMS_ARRAY: [],
+  CUSTOM_URL_PARAMS_ARRAY: [
+    {name: "nmSearch", cleaningMethod: lowerSQL, renameTo: "query", description: "Query performed by a user in Prosegur's internal search engine"}
+  ],
 
   // filters
   // array: list the event names you want to exclude from the events table 
-  EVENTS_TO_EXCLUDE: [],
+  EVENTS_TO_EXCLUDE: [
+    "scroll", "desplazamiento"
+  ],
   // arrays: list the hostnames you want to exclude (or include) from the events table
   // for including/excluding NULL values, use the empty string ( "" )
   HOSTNAME_EXCLUDE: [],
