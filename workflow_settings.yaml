@@ -11,5 +11,5 @@ vars: # Variables que variarás por país/entorno
   TRANSFORMATIONS_DATASET: superform_transformations_389069484
   QUALITY_DATASET:       superform_quality_389069484
   LOCAL_TIMEZONE:        Australia/Perth
-  LABEL_GENERIC_BRAND:   change_group_AU
-  LABEL_EXECUTION_OPERATION: "manual_workflow"
+  LABEL_GENERIC_BRAND:   change_group_au
+  LABEL_EXECUTION_OPERATION: manual_workflow
