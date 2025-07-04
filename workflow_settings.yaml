@@ -1,5 +1,4 @@
 # === workflow_settings.yaml ===
-dataformCoreVersion: 3.0.2          # Ajusta si usas otra versión
 defaultProject: pga-data-b2b-marketing-dev
 defaultLocation: europe-west1
 defaultDataset: analytics_297430230 # Solo un valor por defecto
