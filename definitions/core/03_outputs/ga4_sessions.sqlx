@@ -18,6 +18,7 @@
 config {
   type: "incremental",
   description: "Output sessions table with last non direct logic added",
+  database: dataform.projectConfig.vars.TARGET_PROJECT,
   schema: dataform.projectConfig.vars.OUTPUTS_DATASET,
   tags:[dataform.projectConfig.vars.GA4_DATASET,"sessions","outputs"],
   bigquery: {

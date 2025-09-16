@@ -2,6 +2,7 @@
 
 config {
     type: "operations",
+    database: dataform.projectConfig.vars.TARGET_PROJECT,
     schema: dataform.projectConfig.vars.QUALITY_DATASET,
     hasOutput: true // optional, lets you reference the empty table
 }

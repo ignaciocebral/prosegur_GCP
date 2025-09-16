@@ -18,6 +18,7 @@
 
 config {
     type: "table",
+    database: dataform.projectConfig.vars.TARGET_PROJECT,
     schema: dataform.projectConfig.vars.OUTPUTS_DATASET,
     description: "Daily session aggregate table - can be used for LP report, marketing, etc",
     bigquery: {

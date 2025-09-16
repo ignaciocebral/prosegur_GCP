@@ -18,6 +18,7 @@
 config {
   type: "table",
   tags: [dataform.projectConfig.vars.GA4_DATASET,"transactions","outputs"],
+  database: dataform.projectConfig.vars.TARGET_PROJECT,
   schema: dataform.projectConfig.vars.OUTPUTS_DATASET,
   description: "transactions table with nested items, transaction totals and running totals (based on user_pseudo_id)",
   bigquery: {

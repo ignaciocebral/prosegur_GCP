@@ -1,5 +1,6 @@
 config {
     type: "table",
+    database: dataform.projectConfig.vars.TARGET_PROJECT,
     description: "checking if all the tables are up to date",
     schema: dataform.projectConfig.vars.QUALITY_DATASET,
     dependencies: [

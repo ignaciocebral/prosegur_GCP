@@ -18,6 +18,7 @@
 config {
   type: "incremental",
   tags: [dataform.projectConfig.vars.GA4_DATASET,"transactions","intermediate"],
+  database: dataform.projectConfig.vars.TARGET_PROJECT,
   schema: dataform.projectConfig.vars.TRANSFORMATIONS_DATASET,
   description: "transactions table with nested items - so could be used as line_items table, too",
   bigquery: {

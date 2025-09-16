@@ -1,5 +1,6 @@
 config {
     type: "table",
+    database: dataform.projectConfig.vars.TARGET_PROJECT,
     schema: dataform.projectConfig.vars.QUALITY_DATASET,
     description: "transaction id should not be null or not set",
     dependencies: ["assertion_logs", "events_*"],

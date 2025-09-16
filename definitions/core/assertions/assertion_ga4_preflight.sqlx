@@ -1,0 +1,74 @@
+config {
+    type: "table",
+    database: dataform.projectConfig.vars.TARGET_PROJECT,
+    schema: dataform.projectConfig.vars.QUALITY_DATASET,
+    description: "preflight check to ensure GA4 raw tables exist",
+    dependencies: ["assertion_logs"],
+    tags:[dataform.projectConfig.vars.GA4_DATASET, "assertions"],
+}
+
+js {
+    const { helpers } = require("includes/core/helpers");
+    const config = helpers.getConfig();
+}
+
+SELECT
+  'running assertion' AS placeholder
+
+pre_operations {
+  DECLARE
+    assertion STRING DEFAULT 'ga4 preflight';
+  DECLARE
+    tables_count INT64 DEFAULT 0;
+  DECLARE
+    expectations INT64 DEFAULT 1;
+  DECLARE
+    sample STRING;
+  DECLARE
+    assertion_status STRING DEFAULT 'pass';
+  DECLARE
+    error_msg STRING DEFAULT 'Yippee-ki-yay';
+
+  IF
+    ${config.ASSERTIONS_GA4_PREFLIGHT} THEN
+  SET
+    tables_count = (
+    SELECT
+      COUNT(*)
+    FROM
+      `${dataform.projectConfig.vars.GA4_PROJECT}.${dataform.projectConfig.vars.GA4_DATASET}.INFORMATION_SCHEMA.TABLES`
+    WHERE
+      table_name LIKE 'events_%'
+      AND table_type = 'BASE TABLE');
+  IF
+    tables_count < expectations THEN
+  SET
+    assertion_status = 'fail';
+  SET
+    error_msg = FORMAT('No tables matching events_%% found in %s.%s',
+      '${dataform.projectConfig.vars.GA4_PROJECT}',
+      '${dataform.projectConfig.vars.GA4_DATASET}');
+  END IF
+    ;
+
+  INSERT INTO
+    ${ref("assertion_logs")}
+  VALUES
+    (CURRENT_TIMESTAMP(), assertion, '${ref("events_*")}', expectations, tables_count, sample, assertion_status, error_msg);
+  END IF
+    ;
+}
+
+post_operations {
+  IF
+    ${config.ASSERTIONS_GA4_PREFLIGHT} THEN
+  DROP TABLE
+    ${self()};
+  IF
+    tables_count < expectations THEN RAISE
+  USING
+    MESSAGE = error_msg;
+  END IF
+    ;
+  END IF
+}

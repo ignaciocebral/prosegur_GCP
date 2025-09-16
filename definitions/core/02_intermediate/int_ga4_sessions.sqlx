@@ -18,6 +18,7 @@
 config {
   type: "incremental",
   description: "Intermediate incremental sessions table with modeling helpers implemented. 1 row per unique session_id. Contains only valid sessions.",
+  database: dataform.projectConfig.vars.TARGET_PROJECT,
   schema: dataform.projectConfig.vars.TRANSFORMATIONS_DATASET,
   tags:[dataform.projectConfig.vars.GA4_DATASET,"sessions","intermediate"],
   dependencies: ["source_categories"],

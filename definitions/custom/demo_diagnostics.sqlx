@@ -17,6 +17,7 @@
 
 config {
     type: "table",
+    database: dataform.projectConfig.vars.TARGET_PROJECT,
     schema: dataform.projectConfig.vars.OUTPUTS_DATASET,
     description: "What is in your GA4 - past 64 days",
 }

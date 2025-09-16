@@ -23,5 +23,6 @@ const selectStatements = helpers.getSqlUnionAllFromRowsSQL(rows);
 publish("source_categories", {
   type: "table",
   tags: [dataform.projectConfig.vars.GA4_DATASET],
+  database: dataform.projectConfig.vars.TARGET_PROJECT,
   schema: dataform.projectConfig.vars.TRANSFORMATIONS_DATASET,
 }).query((ctx) => selectStatements);

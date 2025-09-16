@@ -6,10 +6,12 @@ defaultAssertionDataset: superform_assertions
 
 
 vars: # Variables que variarás por país/entorno
-  GA4_DATASET:           analytics_297430230  # Paraguay por defecto
-  OUTPUTS_DATASET:       superform_outputs_297430230
+  GA4_PROJECT:             pga-data-b2b-marketing-dev
+  TARGET_PROJECT:          pga-data-b2b-marketing-dev
+  GA4_DATASET:             analytics_297430230  # Paraguay por defecto
+  OUTPUTS_DATASET:         superform_outputs_297430230
   TRANSFORMATIONS_DATASET: superform_transformations_297430230
-  QUALITY_DATASET:       superform_quality_297430230
-  LOCAL_TIMEZONE:        America/Asuncion
-  LABEL_GENERIC_BRAND:   prosegur_global
+  QUALITY_DATASET:         superform_quality_297430230
+  LOCAL_TIMEZONE:          America/Asuncion
+  LABEL_GENERIC_BRAND:     prosegur_global
   LABEL_EXECUTION_OPERATION: manual_workflow
