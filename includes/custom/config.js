@@ -67,7 +67,9 @@ const customConfig = {
   // ],
   CUSTOM_EVENT_PARAMS_ARRAY: [
     {name: "id_lead", renameTo: "IdLead", type: "string", description: "ID Lead generated when a user submits a form. Unique Lead identifier in the CRM" },
-    {name: "business_type", renameTo: "BusinessType", type: "string", description: "Content about the Business Unit" }
+    {name: "business_type", renameTo: "BusinessType", type: "string", description: "Content about the Business Unit" },
+    {name: "click_text", type: "string", description: "Text the user clicked when the event 'link_click' was triggered." },
+    {name: "click_url", type: "string", description: "URL the user clicked when the event 'link_click' was triggered." }
   ],
 
   // user properties
