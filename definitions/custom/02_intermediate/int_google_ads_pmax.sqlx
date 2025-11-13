@@ -67,6 +67,18 @@ pmax_conversion_stats AS (
     FROM
         exploded
     GROUP BY 1, 2, 3
+),
+clicks_with_cost AS (
+    SELECT
+        cs.Gclid,
+        cs.CampaignId,
+        cs.Date,
+        s.spend / s.clicks AS cost_per_click
+    FROM
+        ${ref("ads_ClickStats_1534842056")} cs
+    LEFT JOIN pmax_stats s
+        ON cs.CampaignId = s.campaign_id
+        AND cs.Date = s.date
 )
 SELECT
     'Google Ads' AS Platform,
@@ -78,7 +90,7 @@ SELECT
     pag.asset_group_name AS ad, -- Using asset group name as ad name for PMax
     CAST(pag.asset_group_id AS STRING) AS ad_id, -- Using asset group id as ad id for PMax
     pag.final_url,
-    ps.spend,
+    cwc.cost_per_click AS spend,
     ps.impressions,
     ps.clicks,
     NULL AS link_clicks,
@@ -86,7 +98,7 @@ SELECT
     coalesce(pconv.form, 0) as form,
     coalesce(pconv.lead_ads, 0) as lead_ads,
     coalesce(pconv.total_conversions, 0) as total_conversions,
-    cs.Gclid
+    cwc.Gclid
 FROM
     pmax_stats ps
 LEFT JOIN pmax_conversion_stats pconv
@@ -98,6 +110,6 @@ LEFT JOIN pmax_campaign_base pc
     AND ps.customer_id = pc.customer_id
 LEFT JOIN pmax_assetgroup_base pag
     ON ps.campaign_id = pag.campaign_id
-LEFT JOIN ${ref("ads_ClickStats_1534842056")} cs
-    ON ps.campaign_id = cs.CampaignId
-    AND ps.date = cs.Date
+LEFT JOIN clicks_with_cost cwc
+    ON ps.campaign_id = cwc.CampaignId
+    AND ps.date = cwc.Date
