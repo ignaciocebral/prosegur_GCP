@@ -1,0 +1,142 @@
+
+config {
+  type: "table",
+  schema: dataform.projectConfig.vars.TRANSFORMATIONS_DATASET,
+  name: "int_google_ads_non_pmax"
+}
+
+WITH campaign_base AS (
+    SELECT
+        c.campaign_id,
+        c.customer_id,
+        c.campaign_name,
+        c.campaign_advertising_channel_type
+    FROM
+        ${ref("ads_Campaign_1534842056")} c
+    WHERE
+        c._DATA_DATE = c._LATEST_DATE
+        AND c.customer_id = 1703013237
+        AND c.campaign_advertising_channel_type != 'PERFORMANCE_MAX'
+),
+adgroup_base AS (
+    SELECT
+        ag.ad_group_id,
+        ag.customer_id,
+        ag.campaign_id,
+        ag.ad_group_name
+    FROM
+        ${ref("ads_AdGroup_1534842056")} ag
+    WHERE
+        ag._DATA_DATE = ag._LATEST_DATE AND ag.customer_id = 1703013237
+),
+ad_base AS (
+    SELECT
+        a.ad_group_ad_ad_id,
+        a.ad_group_id,
+        a.customer_id,
+        a.campaign_id,
+        COALESCE(
+            REGEXP_EXTRACT(a.ad_group_ad_ad_final_urls, r'"(.*?)"'),
+            REGEXP_EXTRACT(a.ad_group_ad_ad_final_mobile_urls, r'"(.*?)"'),
+            a.ad_group_ad_ad_display_url
+        ) AS final_url,
+        CASE
+            WHEN a.ad_group_ad_ad_type = 'EXPANDED_TEXT_AD' THEN
+                CONCAT(
+                    COALESCE(a.ad_group_ad_ad_expanded_text_ad_headline_part1, ''),
+                    ' - ',
+                    COALESCE(a.ad_group_ad_ad_expanded_text_ad_headline_part2, '')
+                )
+            WHEN a.ad_group_ad_ad_type = 'RESPONSIVE_SEARCH_AD' THEN
+                REGEXP_EXTRACT(a.ad_group_ad_ad_responsive_search_ad_headlines, r'"(.*?)"')
+            WHEN a.ad_group_ad_ad_type = 'IMAGE_AD' THEN
+                a.ad_group_ad_ad_image_ad_name
+            WHEN a.ad_group_ad_ad_type = 'CALL_AD' THEN
+                a.ad_group_ad_ad_call_ad_phone_number
+            WHEN a.ad_group_ad_ad_type = 'RESPONSIVE_DISPLAY_AD' THEN
+                a.ad_group_ad_ad_responsive_display_ad_long_headline
+            ELSE
+                'Unknown'
+        END AS ad_name
+    FROM
+        ${ref("ads_Ad_1534842056")} a
+    WHERE
+        a._DATA_DATE = a._LATEST_DATE AND a.customer_id = 1703013237
+),
+ad_stats AS (
+    SELECT
+        ads.ad_group_id,
+        ads.customer_id,
+        ads.ad_group_ad_ad_id,
+        ads.segments_date AS date,
+        SUM(ads.metrics_impressions) AS impressions,
+        SUM(ads.metrics_clicks) as clicks,
+        SUM(ads.metrics_cost_micros) / 1000000 AS spend
+    FROM
+        ${ref("ads_AdBasicStats_1534842056")} ads where ads.customer_id = 1703013237
+    GROUP BY 1, 2, 3, 4
+),
+ad_conversion_stats AS (
+    WITH exploded AS (
+        SELECT
+            conv.ad_group_id,
+            conv.customer_id,
+            conv.segments_date AS date,
+            conv.ad_group_ad_ad_id,
+            LOWER(conv.segments_conversion_action_name) AS name,
+            COALESCE(conv.metrics_conversions, 0) AS conversions
+        FROM
+            ${ref("ads_AdConversionStats_1534842056")} conv where conv.customer_id = 1703013237
+    )
+    SELECT
+        ad_group_id,
+        customer_id,
+        date,
+        ad_group_ad_ad_id,
+        SUM(CASE WHEN name = 'cmb' THEN conversions ELSE 0 END) AS cmb,
+        SUM(CASE WHEN name = 'form' THEN conversions ELSE 0 END) AS form,
+        0 AS lead_ads,
+        SUM(conversions) AS total_conversions
+    FROM
+        exploded
+    GROUP BY 1, 2, 3, 4
+)
+SELECT
+    'Google Ads' AS Platform,
+    s.date,
+    CAST(c.campaign_id AS STRING) AS id,
+    c.campaign_name AS campaign,
+    ag.ad_group_name AS adset,
+    CAST(ag.ad_group_id AS STRING) AS adset_id,
+    ads.ad_name AS ad,
+    CAST(ads.ad_group_ad_ad_id AS STRING) AS ad_id,
+    ads.final_url,
+    s.spend,
+    s.impressions,
+    s.clicks,
+    NULL AS link_clicks,
+    coalesce(conv.cmb, 0) as cmb,
+    coalesce(conv.form, 0) as form,
+    coalesce(conv.lead_ads, 0) as lead_ads,
+    coalesce(conv.total_conversions, 0) as total_conversions,
+    cs.Gclid
+FROM
+    ad_stats s
+LEFT JOIN ad_conversion_stats conv
+    ON s.ad_group_id = conv.ad_group_id
+    AND s.customer_id = conv.customer_id
+    AND s.ad_group_ad_ad_id = conv.ad_group_ad_ad_id
+    AND s.date = conv.date
+LEFT JOIN ad_base ads
+    ON s.ad_group_id = ads.ad_group_id
+    AND s.customer_id = ads.customer_id
+    AND s.ad_group_ad_ad_id = ads.ad_group_ad_ad_id
+LEFT JOIN adgroup_base ag
+    ON s.ad_group_id = ag.ad_group_id
+    AND s.customer_id = ag.customer_id
+LEFT JOIN campaign_base c
+    ON ag.campaign_id = c.campaign_id
+    AND ag.customer_id = c.customer_id
+LEFT JOIN ${ref("ads_ClickStats_1534842056")} cs
+    ON s.ad_group_ad_ad_id = cs.AdId
+    AND s.date = cs.Date

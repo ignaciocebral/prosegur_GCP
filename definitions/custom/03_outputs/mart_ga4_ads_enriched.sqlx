@@ -1,0 +1,31 @@
+
+config {
+  type: "table",
+  schema: dataform.projectConfig.vars.OUTPUTS_DATASET,
+  name: "mart_ga4_ads_enriched"
+}
+
+SELECT
+  s.*,
+  a.Platform,
+  a.id,
+  a.campaign,
+  a.adset,
+  a.adset_id,
+  a.ad,
+  a.ad_id,
+  a.final_url,
+  a.spend,
+  a.impressions,
+  a.clicks,
+  a.link_clicks,
+  a.cmb,
+  a.form,
+  a.lead_ads,
+  a.total_conversions
+FROM
+  ${ref(dataform.projectConfig.vars.TRANSFORMATIONS_DATASET, "int_ga4_sessions")} s
+LEFT JOIN
+  ${ref("int_google_ads_unified")} a
+ON
+  s.session_source.first.gclid = a.Gclid

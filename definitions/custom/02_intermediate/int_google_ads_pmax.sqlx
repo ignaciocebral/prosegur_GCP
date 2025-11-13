@@ -1,0 +1,103 @@
+config {
+  type: "table",
+  schema: dataform.projectConfig.vars.TRANSFORMATIONS_DATASET,
+  name: "int_google_ads_pmax"
+}
+
+WITH pmax_campaign_base AS (
+    SELECT
+        c.campaign_id,
+        c.customer_id,
+        c.campaign_name
+    FROM
+        ${ref("ads_Campaign_1534842056")} c
+    WHERE
+        c._DATA_DATE = c._LATEST_DATE
+        AND c.customer_id = 1703013237
+        AND c.campaign_advertising_channel_type = 'PERFORMANCE_MAX'
+),
+pmax_assetgroup_base AS (
+    SELECT
+        REPLACE(ag.asset_group_id, 'assetGroups/', '') AS asset_group_id,
+        ag.asset_group_name,
+        CAST(REGEXP_EXTRACT(ag.asset_group_campaign, r'campaigns/(\d+)') AS INT64) AS campaign_id,
+        REGEXP_EXTRACT(ag.asset_group_final_urls, r'"(.*?)"') AS final_url
+    FROM
+        ${ref("ads_AssetGroup_1534842056")} ag
+    WHERE
+        ag._DATA_DATE = ag._LATEST_DATE
+),
+pmax_stats AS (
+    SELECT
+        cs.campaign_id,
+        cs.customer_id,
+        cs.segments_date AS date,
+        SUM(cs.metrics_impressions) AS impressions,
+        SUM(cs.metrics_clicks) AS clicks,
+        SUM(cs.metrics_cost_micros) / 1000000 AS spend
+    FROM
+        ${ref("ads_CampaignBasicStats_1534842056")} cs
+    WHERE
+        cs._DATA_DATE = cs._LATEST_DATE
+        AND cs.customer_id = 1703013237
+    GROUP BY 1, 2, 3
+),
+pmax_conversion_stats AS (
+    WITH exploded AS (
+        SELECT
+            conv.campaign_id,
+            conv.customer_id,
+            conv.segments_date AS date,
+            LOWER(conv.segments_conversion_action_name) AS name,
+            COALESCE(conv.metrics_conversions, 0) AS conversions
+        FROM
+            ${ref("ads_CampaignConversionStats_1534842056")} conv
+        WHERE
+            conv._DATA_DATE = conv._LATEST_DATE
+            AND conv.customer_id = 1703013237
+    )
+    SELECT
+        campaign_id,
+        customer_id,
+        date,
+        SUM(CASE WHEN name = 'cmb' THEN conversions ELSE 0 END) AS cmb,
+        SUM(CASE WHEN name = 'form' THEN conversions ELSE 0 END) AS form,
+        0 AS lead_ads,
+        SUM(conversions) AS total_conversions
+    FROM
+        exploded
+    GROUP BY 1, 2, 3
+)
+SELECT
+    'Google Ads' AS Platform,
+    ps.date,
+    CAST(pc.campaign_id AS STRING) AS id,
+    pc.campaign_name AS campaign,
+    pag.asset_group_name AS adset,
+    CAST(pag.asset_group_id AS STRING) AS adset_id,
+    pag.asset_group_name AS ad, -- Using asset group name as ad name for PMax
+    CAST(pag.asset_group_id AS STRING) AS ad_id, -- Using asset group id as ad id for PMax
+    pag.final_url,
+    ps.spend,
+    ps.impressions,
+    ps.clicks,
+    NULL AS link_clicks,
+    coalesce(pconv.cmb, 0) as cmb,
+    coalesce(pconv.form, 0) as form,
+    coalesce(pconv.lead_ads, 0) as lead_ads,
+    coalesce(pconv.total_conversions, 0) as total_conversions,
+    cs.Gclid
+FROM
+    pmax_stats ps
+LEFT JOIN pmax_conversion_stats pconv
+    ON ps.campaign_id = pconv.campaign_id
+    AND ps.customer_id = pconv.customer_id
+    AND ps.date = pconv.date
+LEFT JOIN pmax_campaign_base pc
+    ON ps.campaign_id = pc.campaign_id
+    AND ps.customer_id = pc.customer_id
+LEFT JOIN pmax_assetgroup_base pag
+    ON ps.campaign_id = pag.campaign_id
+LEFT JOIN ${ref("ads_ClickStats_1534842056")} cs
+    ON ps.campaign_id = cs.CampaignId
+    AND ps.date = cs.Date
