@@ -69,10 +69,12 @@ ad_stats AS (
         ads.ad_group_ad_ad_id,
         ads.segments_date AS date,
         SUM(ads.metrics_impressions) AS impressions,
-        SUM(ads.metrics_clicks) as clicks,
+        SUM(ads.metrics_clicks) AS clicks,
         SUM(ads.metrics_cost_micros) / 1000000 AS spend
     FROM
-        ${ref("ads_AdBasicStats_1534842056")} ads where ads.customer_id = 1703013237
+        ${ref("ads_AdBasicStats_1534842056")} ads
+    WHERE
+        ads.customer_id = 1703013237
     GROUP BY 1, 2, 3, 4
 ),
 ad_conversion_stats AS (
@@ -100,54 +102,57 @@ ad_conversion_stats AS (
         exploded
     GROUP BY 1, 2, 3, 4
 ),
-clicks_with_cost AS (
+click_details AS (
     SELECT
         cs.Gclid,
         cs.AdId,
-        cs.Date,
-        s.spend / s.clicks AS cost_per_click
+        cs.AdGroupId,
+        cs.CampaignId,
+        cs.CustomerId,
+        cs.Date
     FROM
         ${ref("ads_ClickStats_1534842056")} cs
-    LEFT JOIN ad_stats s
-        ON cs.AdId = s.ad_group_ad_ad_id
-        AND cs.Date = s.date
+    WHERE
+        cs.CustomerId = 1703013237
+        AND cs.Gclid IS NOT NULL
 )
 SELECT
     'Google Ads' AS Platform,
-    s.date,
+    cd.Date AS date,
     CAST(c.campaign_id AS STRING) AS id,
     c.campaign_name AS campaign,
     ag.ad_group_name AS adset,
-    CAST(ag.ad_group_id AS STRING) AS adset_id,
+    CAST(cd.AdGroupId AS STRING) AS adset_id,
     ads.ad_name AS ad,
-    CAST(ads.ad_group_ad_ad_id AS STRING) AS ad_id,
+    CAST(cd.AdId AS STRING) AS ad_id,
     ads.final_url,
-    cwc.cost_per_click AS spend,
-    s.impressions,
-    s.clicks,
+    COALESCE(SAFE_DIVIDE(s.spend, NULLIF(s.clicks, 0)), 0) AS spend,
+    COALESCE(SAFE_DIVIDE(s.impressions, NULLIF(s.clicks, 0)), 0) AS impressions,
+    COALESCE(SAFE_DIVIDE(s.clicks, NULLIF(s.clicks, 0)), 0) AS clicks,
     NULL AS link_clicks,
-    coalesce(conv.cmb, 0) as cmb,
-    coalesce(conv.form, 0) as form,
-    coalesce(conv.lead_ads, 0) as lead_ads,
-    coalesce(conv.total_conversions, 0) as total_conversions,
-    cwc.Gclid
+    COALESCE(SAFE_DIVIDE(conv.cmb, NULLIF(s.clicks, 0)), 0) AS cmb,
+    COALESCE(SAFE_DIVIDE(conv.form, NULLIF(s.clicks, 0)), 0) AS form,
+    COALESCE(SAFE_DIVIDE(conv.lead_ads, NULLIF(s.clicks, 0)), 0) AS lead_ads,
+    COALESCE(SAFE_DIVIDE(conv.total_conversions, NULLIF(s.clicks, 0)), 0) AS total_conversions,
+    cd.Gclid
 FROM
-    ad_stats s
+    click_details cd
+LEFT JOIN ad_stats s
+    ON cd.AdId = s.ad_group_ad_ad_id
+    AND cd.AdGroupId = s.ad_group_id
+    AND cd.CustomerId = s.customer_id
+    AND cd.Date = s.date
 LEFT JOIN ad_conversion_stats conv
-    ON s.ad_group_id = conv.ad_group_id
-    AND s.customer_id = conv.customer_id
-    AND s.ad_group_ad_ad_id = conv.ad_group_ad_ad_id
-    AND s.date = conv.date
+    ON cd.AdId = conv.ad_group_ad_ad_id
+    AND cd.AdGroupId = conv.ad_group_id
+    AND cd.CustomerId = conv.customer_id
+    AND cd.Date = conv.date
 LEFT JOIN ad_base ads
-    ON s.ad_group_id = ads.ad_group_id
-    AND s.customer_id = ads.customer_id
-    AND s.ad_group_ad_ad_id = ads.ad_group_ad_ad_id
+    ON cd.AdId = ads.ad_group_ad_ad_id
+    AND cd.CustomerId = ads.customer_id
 LEFT JOIN adgroup_base ag
-    ON s.ad_group_id = ag.ad_group_id
-    AND s.customer_id = ag.customer_id
-LEFT JOIN campaign_base c
-    ON ag.campaign_id = c.campaign_id
-    AND ag.customer_id = c.customer_id
-LEFT JOIN clicks_with_cost cwc
-    ON s.ad_group_ad_ad_id = cwc.AdId
-    AND s.date = cwc.Date
+    ON cd.AdGroupId = ag.ad_group_id
+    AND cd.CustomerId = ag.customer_id
+JOIN campaign_base c
+    ON cd.CampaignId = c.campaign_id
+    AND cd.CustomerId = c.customer_id
