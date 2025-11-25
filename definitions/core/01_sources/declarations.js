@@ -16,7 +16,7 @@
 */
 
 declare({
-    database: dataform.projectConfig.defaultProject,
+    database: dataform.projectConfig.vars.GA4_PROJECT,
     schema: dataform.projectConfig.vars.GA4_DATASET,
     name: 'events_*',
 });
