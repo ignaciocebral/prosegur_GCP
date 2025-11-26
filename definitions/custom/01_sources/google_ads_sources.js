@@ -51,3 +51,21 @@ declare({
   schema: "google_ads_mcc",
   name: "ads_ClickStats_1534842056"
 });
+
+declare({
+  database: "pga-data-b2b-marketing-dev",
+  schema: "google_ads_mcc",
+  name: "ads_Customer_1534842056"
+});
+
+declare({
+  database: "pga-data-b2b-marketing-dev",
+  schema: "google_ads_mcc",
+  name: "ads_AdGroupStats_1534842056"
+});
+
+declare({
+  database: "pga-data-b2b-marketing-dev",
+  schema: "google_ads_mcc",
+  name: "ads_AdGroupConversionStats_1534842056"
+});
