@@ -2,7 +2,8 @@ config {
   type: "table",
   schema: dataform.projectConfig.vars.TRANSFORMATIONS_DATASET,
   name: "int_google_ads_pmax",
-  tags: [dataform.projectConfig.vars.LABEL_EXECUTION_OPERATION]
+  tags: [dataform.projectConfig.vars.LABEL_EXECUTION_OPERATION],
+  disabled: true
 }
 
 WITH pmax_campaign_base AS (

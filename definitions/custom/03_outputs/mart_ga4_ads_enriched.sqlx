@@ -3,7 +3,8 @@ config {
   type: "table",
   schema: dataform.projectConfig.vars.OUTPUTS_DATASET,
   name: "mart_ga4_ads_enriched",
-  tags: [dataform.projectConfig.vars.LABEL_EXECUTION_OPERATION]
+  tags: [dataform.projectConfig.vars.LABEL_EXECUTION_OPERATION],
+  disabled: true
 }
 
 SELECT
