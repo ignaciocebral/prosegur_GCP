@@ -103,16 +103,16 @@ ad_conversion_stats AS (
 ),
 clicks_with_cost AS (
     SELECT
-        cs.Gclid,
+        cs.click_view_gclid as Gclid,
         CAST(REGEXP_EXTRACT(cs.click_view_ad_group_ad, r'~(\d+)$') AS STRING) AS AdId,
-        cs.Date
+        cs.segments_date
     FROM
         ${ref("ads_ClickStats_1534842056")} cs
 ),
 clicks_with_ad_details AS (
     SELECT
         cwc.Gclid,
-        cwc.Date,
+        cwc.segments_date,
         cwc.AdId,
         ads.ad_group_id,
         ads.customer_id,
@@ -133,15 +133,15 @@ clicks_with_ad_details AS (
     LEFT JOIN ad_stats stats
         ON ads.ad_group_ad_ad_id = stats.ad_group_ad_ad_id
         AND ads.customer_id = stats.customer_id
-        AND cwc.Date = stats.date
+        AND cwc.segments_date = stats.date
     LEFT JOIN ad_conversion_stats conv
         ON ads.ad_group_ad_ad_id = conv.ad_group_ad_ad_id
         AND ads.customer_id = conv.customer_id
-        AND cwc.Date = conv.date
+        AND cwc.segments_date = conv.date
 )
 SELECT
     'Google Ads' AS Platform,
-    clicks.date,
+    clicks.segments_date as date,
     CAST(c.campaign_id AS STRING) AS id,
     c.campaign_name AS campaign,
     ag.ad_group_name AS adset,

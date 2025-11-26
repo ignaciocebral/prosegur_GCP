@@ -71,15 +71,15 @@ pmax_conversion_stats AS (
 ),
 clicks_with_cost AS (
     SELECT
-        cs.Gclid,
-        cs.CampaignId,
-        cs.Date,
+        cs.click_view_gclid as Gclid,
+        cs.campaign_id,
+        cs.segments_date as Date,
         s.spend / s.clicks AS cost_per_click
     FROM
         ${ref("ads_ClickStats_1534842056")} cs
     LEFT JOIN pmax_stats s
-        ON cs.CampaignId = s.campaign_id
-        AND cs.Date = s.date
+        ON cs.campaign_id = s.campaign_id
+        AND cs.segments_date = s.date
 )
 SELECT
     'Google Ads' AS Platform,
@@ -112,5 +112,5 @@ LEFT JOIN pmax_campaign_base pc
 LEFT JOIN pmax_assetgroup_base pag
     ON ps.campaign_id = pag.campaign_id
 LEFT JOIN clicks_with_cost cwc
-    ON ps.campaign_id = cwc.CampaignId
+    ON ps.campaign_id = cwc.campaign_id
     AND ps.date = cwc.Date
