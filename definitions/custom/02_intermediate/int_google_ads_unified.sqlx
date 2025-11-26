@@ -1,0 +1,10 @@
+
+config {
+  type: "table",
+  schema: dataform.projectConfig.vars.TRANSFORMATIONS_DATASET,
+  name: "int_google_ads_unified"
+}
+
+SELECT * FROM ${ref("int_google_ads_non_pmax")}
+UNION ALL
+SELECT * FROM ${ref("int_google_ads_pmax")}

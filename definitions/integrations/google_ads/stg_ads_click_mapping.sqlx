@@ -1,0 +1,65 @@
+config {
+  type: "table",
+  schema: dataform.projectConfig.vars.TRANSFORMATIONS_DATASET,
+  tags: ["marketing", "google_ads"],
+  description: "Mapping table to decode GCLIDs into Campaign, Ad Group, and Account names.",
+  bigquery: {
+    partitionBy: "date",
+    clusterBy: ["gclid"]
+  }
+}
+
+WITH unique_clicks AS (
+  SELECT DISTINCT
+    click_view_gclid AS gclid,
+    campaign_id,
+    ad_group_id,
+    customer_id,
+    segments_date as date
+  FROM
+    ${ref("ads_ClickStats_1534842056")}
+  WHERE
+    click_view_gclid IS NOT NULL
+),
+
+campaigns AS (
+  SELECT DISTINCT
+    campaign_id,
+    campaign_name
+  FROM
+    ${ref("ads_Campaign_1534842056")}
+),
+
+ad_groups AS (
+  SELECT DISTINCT
+    ad_group_id,
+    ad_group_name
+  FROM
+    ${ref("ads_AdGroup_1534842056")}
+),
+
+accounts AS (
+  SELECT DISTINCT
+    customer_id,
+    customer_descriptive_name AS account_name
+  FROM
+    ${ref("ads_Customer_1534842056")}
+)
+
+SELECT
+  c.gclid,
+  c.date,
+  c.campaign_id,
+  cmp.campaign_name,
+  c.ad_group_id,
+  ag.ad_group_name,
+  c.customer_id,
+  acc.account_name
+FROM
+  unique_clicks c
+LEFT JOIN
+  campaigns cmp USING(campaign_id)
+LEFT JOIN
+  ad_groups ag USING(ad_group_id)
+LEFT JOIN
+  accounts acc USING(customer_id)
