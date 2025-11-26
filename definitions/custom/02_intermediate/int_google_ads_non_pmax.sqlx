@@ -1,7 +1,8 @@
 config {
   type: "table",
   schema: dataform.projectConfig.vars.TRANSFORMATIONS_DATASET,
-  name: "int_google_ads_non_pmax"
+  name: "int_google_ads_non_pmax",
+  tags: [dataform.projectConfig.vars.LABEL_EXECUTION_OPERATION]
 }
 
 WITH campaign_base AS (
@@ -103,51 +104,65 @@ ad_conversion_stats AS (
 clicks_with_cost AS (
     SELECT
         cs.Gclid,
-        cs.AdId,
-        cs.Date,
-        s.spend / s.clicks AS cost_per_click
+        CAST(REGEXP_EXTRACT(cs.click_view_ad_group_ad, r'~(\d+)$') AS STRING) AS AdId,
+        cs.Date
     FROM
         ${ref("ads_ClickStats_1534842056")} cs
-    LEFT JOIN ad_stats s
-        ON cs.AdId = s.ad_group_ad_ad_id
-        AND cs.Date = s.date
+),
+clicks_with_ad_details AS (
+    SELECT
+        cwc.Gclid,
+        cwc.Date,
+        cwc.AdId,
+        ads.ad_group_id,
+        ads.customer_id,
+        ads.ad_group_ad_ad_id,
+        ads.ad_name,
+        ads.final_url,
+        stats.spend,       -- Total spend for this Ad on this Date
+        stats.impressions, -- Total impressions for this Ad on this Date
+        stats.clicks,      -- Total clicks for this Ad on this Date
+        conv.cmb,
+        conv.form,
+        conv.lead_ads,
+        conv.total_conversions
+    FROM
+        clicks_with_cost cwc -- Start from individual clicks
+    LEFT JOIN ad_base ads
+        ON cwc.AdId = CAST(ads.ad_group_ad_ad_id AS STRING) -- Join on extracted AdId
+    LEFT JOIN ad_stats stats
+        ON ads.ad_group_ad_ad_id = stats.ad_group_ad_ad_id
+        AND ads.customer_id = stats.customer_id
+        AND cwc.Date = stats.date
+    LEFT JOIN ad_conversion_stats conv
+        ON ads.ad_group_ad_ad_id = conv.ad_group_ad_ad_id
+        AND ads.customer_id = conv.customer_id
+        AND cwc.Date = conv.date
 )
 SELECT
     'Google Ads' AS Platform,
-    s.date,
+    clicks.date,
     CAST(c.campaign_id AS STRING) AS id,
     c.campaign_name AS campaign,
     ag.ad_group_name AS adset,
     CAST(ag.ad_group_id AS STRING) AS adset_id,
-    ads.ad_name AS ad,
-    CAST(ads.ad_group_ad_ad_id AS STRING) AS ad_id,
-    ads.final_url,
-    cwc.cost_per_click AS spend,
-    s.impressions,
-    s.clicks,
+    clicks.ad_name AS ad,
+    CAST(clicks.AdId AS STRING) AS ad_id, -- Use extracted AdId
+    clicks.final_url,
+    SAFE_DIVIDE(clicks.spend, clicks.clicks) AS spend, -- Cost per click from aggregated spend
+    clicks.impressions,
+    clicks.clicks,
     NULL AS link_clicks,
-    coalesce(conv.cmb, 0) as cmb,
-    coalesce(conv.form, 0) as form,
-    coalesce(conv.lead_ads, 0) as lead_ads,
-    coalesce(conv.total_conversions, 0) as total_conversions,
-    cwc.Gclid
+    coalesce(clicks.cmb, 0) as cmb,
+    coalesce(clicks.form, 0) as form,
+    coalesce(clicks.lead_ads, 0) as lead_ads,
+    coalesce(clicks.total_conversions, 0) as total_conversions,
+    clicks.Gclid
 FROM
-    ad_stats s
-LEFT JOIN ad_conversion_stats conv
-    ON s.ad_group_id = conv.ad_group_id
-    AND s.customer_id = conv.customer_id
-    AND s.ad_group_ad_ad_id = conv.ad_group_ad_ad_id
-    AND s.date = conv.date
-LEFT JOIN ad_base ads
-    ON s.ad_group_id = ads.ad_group_id
-    AND s.customer_id = ads.customer_id
-    AND s.ad_group_ad_ad_id = ads.ad_group_ad_ad_id
+    clicks_with_ad_details clicks
 LEFT JOIN adgroup_base ag
-    ON s.ad_group_id = ag.ad_group_id
-    AND s.customer_id = ag.customer_id
+    ON clicks.ad_group_id = ag.ad_group_id
+    AND clicks.customer_id = ag.customer_id
 LEFT JOIN campaign_base c
     ON ag.campaign_id = c.campaign_id
     AND ag.customer_id = c.customer_id
-LEFT JOIN clicks_with_cost cwc
-    ON s.ad_group_ad_ad_id = cwc.AdId
-    AND s.date = cwc.Date
