@@ -1,0 +1,100 @@
+config {
+  type: "table",
+  schema: dataform.projectConfig.vars.TRANSFORMATIONS_DATASET,
+  tags: ["marketing", "google_ads"],
+  description: "Daily performance metrics (Cost, Impressions, Clicks) and Conversions by AdGroup and Conversion Type.",
+  bigquery: {
+    partitionBy: "date",
+    clusterBy: ["customer_id", "campaign_id"]
+  }
+}
+
+WITH basic_stats AS (
+  SELECT
+    segments_date AS date,
+    customer_id,
+    campaign_id,
+    ad_group_id,
+    SUM(metrics_impressions) AS impressions,
+    SUM(metrics_clicks) AS clicks,
+    SUM(metrics_cost_micros) / 1000000 AS cost
+  FROM
+    ${ref("ads_AdGroupStats_1534842056")}
+  GROUP BY
+    1, 2, 3, 4
+),
+
+conversion_stats AS (
+  SELECT
+    segments_date AS date,
+    customer_id,
+    campaign_id,
+    ad_group_id,
+    -- Pivot Conversions based on Action Name
+    -- CRM: Cualificado, Positivo, Formulario_04
+    SUM(CASE WHEN segments_conversion_action_name LIKE '%Cualificado%' OR segments_conversion_action_name LIKE '%Positivo%' OR segments_conversion_action_name = 'Formulario_04' THEN metrics_conversions ELSE 0 END) AS conversions_crm,
+    
+    -- Form: Form, Website lead, Envío de formulario..., Lead form - Submit, Formularios
+    -- Excluded 'Formulario_04' as it is now in CRM
+    SUM(CASE WHEN segments_conversion_action_name IN ('Form', 'Website lead', 'Envío de formulario para clientes potenciales', 'Lead form - Submit', 'Formularios') THEN metrics_conversions ELSE 0 END) AS conversions_form,
+    
+    -- Call: CMB, Llamadas..., C2C
+    SUM(CASE WHEN segments_conversion_action_name IN ('CMB', 'Llamadas desde anuncios (GAds)', 'Llamadas a teléfono en sitio web (desvío de llamada)', 'Clics en el número de teléfono en tu sitio web móvi (C2C)', 'C2C') THEN metrics_conversions ELSE 0 END) AS conversions_call,
+    
+    -- Total Conversions (All types)
+    SUM(metrics_conversions) AS conversions_total,
+    SUM(metrics_conversions_value) AS conversions_value_total
+  FROM
+    ${ref("ads_AdGroupConversionStats_1534842056")}
+  GROUP BY
+    1, 2, 3, 4
+),
+
+customer_info AS (
+    SELECT 
+        customer_id,
+        customer_descriptive_name,
+        CASE 
+            WHEN customer_id = 4263469660 THEN 'Argentina'
+            WHEN customer_id = 9192320856 THEN 'Brasil'
+            WHEN customer_id = 2412701548 THEN 'Colombia'
+            WHEN customer_id = 3987648656 THEN 'Peru'
+            WHEN customer_id = 1703013237 THEN 'Espana'
+            WHEN customer_id = 9812854435 THEN 'Paraguay'
+            WHEN customer_id = 2407906005 THEN 'Chile'
+            WHEN customer_id = 8037331123 THEN 'Portugal'
+            ELSE 'Other'
+        END as country_code
+    FROM ${ref("ads_Customer_1534842056")}
+)
+
+SELECT
+  s.date,
+  cust.country_code,
+  cust.customer_descriptive_name,
+  s.customer_id,
+  s.campaign_id,
+  cmp.campaign_name,
+  s.ad_group_id,
+  ag.ad_group_name,
+  
+  s.impressions,
+  s.clicks,
+  s.cost,
+  
+  COALESCE(c.conversions_form, 0) AS conversions_form,
+  COALESCE(c.conversions_call, 0) AS conversions_call,
+  COALESCE(c.conversions_crm, 0) AS conversions_crm,
+  COALESCE(c.conversions_total, 0) AS conversions_total,
+  COALESCE(c.conversions_value_total, 0) AS conversions_value_total
+
+FROM
+  basic_stats s
+LEFT JOIN
+  conversion_stats c USING(date, customer_id, campaign_id, ad_group_id)
+LEFT JOIN
+  customer_info cust USING(customer_id)
+LEFT JOIN
+  ${ref("ads_Campaign_1534842056")} cmp ON s.campaign_id = cmp.campaign_id
+LEFT JOIN
+  ${ref("ads_AdGroup_1534842056")} ag ON s.ad_group_id = ag.ad_group_id
