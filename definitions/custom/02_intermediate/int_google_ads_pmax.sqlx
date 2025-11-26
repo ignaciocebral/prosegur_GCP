@@ -13,7 +13,7 @@ WITH pmax_campaign_base AS (
         ${ref("ads_Campaign_1534842056")} c
     WHERE
         c._DATA_DATE = c._LATEST_DATE
-        AND c.customer_id = 1703013237
+        AND c.        AND c.customer_id = ${dataform.projectConfig.vars.GOOGLE_ADS_CUSTOMER_ID}
         AND c.campaign_advertising_channel_type = 'PERFORMANCE_MAX'
 ),
 pmax_assetgroup_base AS (
@@ -39,7 +39,7 @@ pmax_stats AS (
         ${ref("ads_CampaignBasicStats_1534842056")} cs
     WHERE
         cs._DATA_DATE = cs._LATEST_DATE
-        AND cs.customer_id = 1703013237
+        AND cs.        AND c.customer_id = ${dataform.projectConfig.vars.GOOGLE_ADS_CUSTOMER_ID}
     GROUP BY 1, 2, 3
 ),
 pmax_conversion_stats AS (
@@ -54,7 +54,7 @@ pmax_conversion_stats AS (
             ${ref("ads_CampaignConversionStats_1534842056")} conv
         WHERE
             conv._DATA_DATE = conv._LATEST_DATE
-            AND conv.customer_id = 1703013237
+            AND conv.        AND c.customer_id = ${dataform.projectConfig.vars.GOOGLE_ADS_CUSTOMER_ID}
     )
     SELECT
         campaign_id,
