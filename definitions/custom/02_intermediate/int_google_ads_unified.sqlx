@@ -2,7 +2,8 @@
 config {
   type: "table",
   schema: dataform.projectConfig.vars.TRANSFORMATIONS_DATASET,
-  name: "int_google_ads_unified"
+  name: "int_google_ads_unified",
+  tags: [dataform.projectConfig.vars.LABEL_EXECUTION_OPERATION]
 }
 
 SELECT * FROM ${ref("int_google_ads_non_pmax")}
