@@ -13,4 +13,4 @@ vars: # Variables que variarás por país/entorno
   LOCAL_TIMEZONE:        America/Asuncion
   LABEL_GENERIC_BRAND:   prosegur_global
   LABEL_EXECUTION_OPERATION: manual_workflow
-  GOOGLE_ADS_CUSTOMER_ID: "9812854435" # Default value (No Ads) - Override per execution
+  GOOGLE_ADS_CUSTOMER_ID: "0" # Default value (No Ads) - Override per execution
