@@ -1,0 +1,90 @@
+/*
+"""
+Description: Aggregates Meta Ads performance to one row per campaign and date for deterministic session joins.
+Author: Codex
+Date: 2026-02-14
+Purpose: Production
+Retention: Permanent - Required staging bridge for paid attribution enrichment.
+"""
+*/
+
+js {
+  const targetProject = dataform.projectConfig.vars.TARGET_PROJECT || dataform.projectConfig.defaultProject;
+}
+
+config {
+  type: "table",
+  schema: dataform.projectConfig.vars.TRANSFORMATIONS_DATASET,
+  tags: [dataform.projectConfig.vars.LABEL_EXECUTION_OPERATION, "attribution", "meta_ads"],
+  description: "Meta Ads campaign daily bridge with one row per CampaignId and DateStart.",
+  bigquery: {
+    partitionBy: "date",
+    clusterBy: ["campaign_id"]
+  }
+}
+
+WITH src AS (
+  SELECT
+    DateStart AS date,
+    AdAccountId AS ad_account_id,
+    AdAccountName AS ad_account_name,
+    CampaignId AS campaign_id,
+    CampaignName AS campaign_name,
+    AdSetId AS adset_id,
+    AdSetName AS adset_name,
+    CAST(COALESCE(Impressions, 0) AS INT64) AS impressions,
+    CAST(COALESCE(Clicks, 0) AS INT64) AS clicks,
+    CAST(COALESCE(Spend, 0) AS NUMERIC) AS spend,
+    CAST(COALESCE(LinkClicks, 0) AS INT64) AS link_clicks
+  FROM `${targetProject}.meta_global_transfer.AdInsights`
+  WHERE CampaignId IS NOT NULL
+    AND DateStart IS NOT NULL
+),
+
+campaign_daily AS (
+  SELECT
+    date,
+    campaign_id,
+    ANY_VALUE(campaign_name) AS campaign_name,
+    ANY_VALUE(ad_account_id) AS ad_account_id,
+    ANY_VALUE(ad_account_name) AS ad_account_name,
+    SUM(impressions) AS impressions,
+    SUM(clicks) AS clicks,
+    SUM(link_clicks) AS link_clicks,
+    SUM(spend) AS spend
+  FROM src
+  GROUP BY 1, 2
+),
+
+top_adset AS (
+  SELECT
+    date,
+    campaign_id,
+    adset_id,
+    adset_name,
+    SUM(spend) AS adset_spend,
+    ROW_NUMBER() OVER (
+      PARTITION BY date, campaign_id
+      ORDER BY SUM(spend) DESC, adset_id DESC
+    ) AS rn
+  FROM src
+  GROUP BY 1, 2, 3, 4
+)
+
+SELECT
+  c.date,
+  c.ad_account_id,
+  c.ad_account_name,
+  c.campaign_id,
+  c.campaign_name,
+  t.adset_id,
+  t.adset_name,
+  c.impressions,
+  c.clicks,
+  c.link_clicks,
+  c.spend
+FROM campaign_daily c
+LEFT JOIN top_adset t
+  ON c.date = t.date
+  AND c.campaign_id = t.campaign_id
+  AND t.rn = 1

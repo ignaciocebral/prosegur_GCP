@@ -1,0 +1,80 @@
+/*
+"""
+Description: Builds a deterministic Google Ads bridge keyed by gclid and date for session-level attribution joins.
+Author: Codex
+Date: 2026-02-14
+Purpose: Production
+Retention: Permanent - Required staging bridge for paid attribution enrichment.
+"""
+*/
+
+config {
+  type: "table",
+  schema: dataform.projectConfig.vars.TRANSFORMATIONS_DATASET,
+  tags: [dataform.projectConfig.vars.LABEL_EXECUTION_OPERATION, "attribution", "google_ads"],
+  description: "Google Ads deterministic bridge with one row per gclid and date.",
+  bigquery: {
+    partitionBy: "date",
+    clusterBy: ["gclid"]
+  }
+}
+
+WITH perf AS (
+  SELECT
+    segments_date AS date,
+    customer_id,
+    campaign_id,
+    ad_group_id,
+    SUM(metrics_impressions) AS impressions,
+    SUM(metrics_clicks) AS clicks,
+    SUM(metrics_cost_micros) / 1000000 AS spend
+  FROM ${ref("ads_AdGroupStats_1534842056")}
+  GROUP BY 1, 2, 3, 4
+),
+
+joined AS (
+  SELECT
+    c.gclid,
+    c.date,
+    c.customer_id,
+    c.account_name,
+    c.campaign_id,
+    c.campaign_name,
+    c.ad_group_id,
+    c.ad_group_name,
+    COALESCE(p.impressions, 0) AS impressions,
+    COALESCE(p.clicks, 0) AS clicks,
+    COALESCE(p.spend, 0) AS spend
+  FROM ${ref("stg_ads_click_mapping")} c
+  LEFT JOIN perf p
+    ON c.date = p.date
+    AND c.customer_id = p.customer_id
+    AND c.campaign_id = p.campaign_id
+    AND c.ad_group_id = p.ad_group_id
+  WHERE c.gclid IS NOT NULL
+),
+
+ranked AS (
+  SELECT
+    *,
+    ROW_NUMBER() OVER (
+      PARTITION BY gclid, date
+      ORDER BY clicks DESC, spend DESC, campaign_id DESC, ad_group_id DESC
+    ) AS rn
+  FROM joined
+)
+
+SELECT
+  gclid,
+  date,
+  CAST(customer_id AS STRING) AS customer_id,
+  account_name,
+  CAST(campaign_id AS STRING) AS campaign_id,
+  campaign_name,
+  CAST(ad_group_id AS STRING) AS ad_group_id,
+  ad_group_name,
+  impressions,
+  clicks,
+  spend
+FROM ranked
+WHERE rn = 1
