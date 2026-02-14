@@ -105,6 +105,9 @@ ad_conversion_stats AS (
 clicks_with_cost AS (
     SELECT
         cs.click_view_gclid as Gclid,
+        cs.campaign_id,
+        cs.ad_group_id,
+        cs.customer_id,
         CAST(REGEXP_EXTRACT(cs.click_view_ad_group_ad, r'~(\d+)$') AS STRING) AS AdId,
         cs.segments_date
     FROM
@@ -115,8 +118,9 @@ clicks_with_ad_details AS (
         cwc.Gclid,
         cwc.segments_date,
         cwc.AdId,
-        ads.ad_group_id,
-        ads.customer_id,
+        cwc.ad_group_id,
+        cwc.customer_id,
+        cwc.campaign_id,
         ads.ad_group_ad_ad_id,
         ads.ad_name,
         ads.final_url,
@@ -131,22 +135,24 @@ clicks_with_ad_details AS (
         clicks_with_cost cwc -- Start from individual clicks
     LEFT JOIN ad_base ads
         ON cwc.AdId = CAST(ads.ad_group_ad_ad_id AS STRING) -- Join on extracted AdId
+        AND cwc.ad_group_id = ads.ad_group_id
+        AND cwc.customer_id = ads.customer_id
     LEFT JOIN ad_stats stats
-        ON ads.ad_group_ad_ad_id = stats.ad_group_ad_ad_id
-        AND ads.customer_id = stats.customer_id
+        ON cwc.AdId = CAST(stats.ad_group_ad_ad_id AS STRING)
+        AND cwc.customer_id = stats.customer_id
         AND cwc.segments_date = stats.date
     LEFT JOIN ad_conversion_stats conv
-        ON ads.ad_group_ad_ad_id = conv.ad_group_ad_ad_id
-        AND ads.customer_id = conv.customer_id
+        ON cwc.AdId = CAST(conv.ad_group_ad_ad_id AS STRING)
+        AND cwc.customer_id = conv.customer_id
         AND cwc.segments_date = conv.date
 )
 SELECT
     'Google Ads' AS Platform,
     clicks.segments_date as date,
-    CAST(c.campaign_id AS STRING) AS id,
+    CAST(clicks.campaign_id AS STRING) AS id,
     c.campaign_name AS campaign,
     ag.ad_group_name AS adset,
-    CAST(ag.ad_group_id AS STRING) AS adset_id,
+    CAST(clicks.ad_group_id AS STRING) AS adset_id,
     clicks.ad_name AS ad,
     CAST(clicks.AdId AS STRING) AS ad_id, -- Use extracted AdId
     clicks.final_url,
@@ -165,5 +171,5 @@ LEFT JOIN adgroup_base ag
     ON clicks.ad_group_id = ag.ad_group_id
     AND clicks.customer_id = ag.customer_id
 LEFT JOIN campaign_base c
-    ON ag.campaign_id = c.campaign_id
-    AND ag.customer_id = c.customer_id
+    ON clicks.campaign_id = c.campaign_id
+    AND clicks.customer_id = c.customer_id
