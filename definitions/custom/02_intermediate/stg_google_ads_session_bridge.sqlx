@@ -29,9 +29,14 @@ WITH perf AS (
     SUM(metrics_clicks) AS clicks,
     SUM(metrics_cost_micros) / 1000000 AS spend
   FROM ${ref("ads_AdGroupStats_1534842056")}
+  WHERE customer_id = CAST(${dataform.projectConfig.vars.GOOGLE_ADS_CUSTOMER_ID} AS INT64)
   GROUP BY 1, 2, 3, 4
 ),
 
+-- Deduplication rules (ranked CTE):
+-- 1. Prefer gclid+date combinations with higher clicks (more active ad group)
+-- 2. Break ties by spend (higher spend = more relevant)
+-- 3. Final tiebreak by campaign_id, ad_group_id DESC (deterministic)
 joined AS (
   SELECT
     c.gclid,

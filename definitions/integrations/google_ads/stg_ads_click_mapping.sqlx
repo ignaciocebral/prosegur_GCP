@@ -20,6 +20,7 @@ WITH unique_clicks AS (
     ${ref("ads_ClickStats_1534842056")}
   WHERE
     click_view_gclid IS NOT NULL
+    AND customer_id = CAST(${dataform.projectConfig.vars.GOOGLE_ADS_CUSTOMER_ID} AS INT64)
 ),
 
 campaigns AS (

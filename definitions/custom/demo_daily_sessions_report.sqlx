@@ -10,7 +10,7 @@
 
     This program is distributed in the hope that it will be useful,
     but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. 
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 
 */
 
@@ -20,6 +20,7 @@ config {
     type: "table",
     schema: dataform.projectConfig.vars.OUTPUTS_DATASET,
     description: "Daily session aggregate table - can be used for LP report, marketing, etc",
+    disabled: false,
     bigquery: {
         partitionBy: "session_date"
     }
@@ -76,8 +77,8 @@ with sessions_aggregation as (
 
         countif(e.event_name = 'generate_lead') as generate_lead,
         sum(e.ecommerce.purchase_revenue) as revenue,
-     
-    
+
+
     from ${ref("ga4_sessions")} s
     left join ${ref("ga4_events")} e
         on s.session_id = e.session_id
@@ -111,7 +112,7 @@ daily_aggregation as (
         session_default_channel_grouping,
 
         -- google attribution (if available)
-        last_click_google_ads_campaign
+        last_click_google_ads_campaign,
         last_click_campaign_name,
         last_click_source,
         last_click_medium,
@@ -124,7 +125,7 @@ daily_aggregation as (
 
         count(distinct session_id) as sessions,
         count(distinct if(is_engaged_session, session_id, null)) as engaged_sessions,
-        
+
 
         sum(page_view) as page_view,
         sum(view_search_results) as view_search_results,

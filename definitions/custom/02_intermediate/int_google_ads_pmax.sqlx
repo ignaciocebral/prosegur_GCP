@@ -75,43 +75,61 @@ clicks_with_cost AS (
         cs.click_view_gclid as Gclid,
         cs.campaign_id,
         cs.segments_date as Date,
-        s.spend / s.clicks AS cost_per_click
+        SAFE_DIVIDE(s.spend, s.clicks) AS cost_per_click
     FROM
         ${ref("ads_ClickStats_1534842056")} cs
     LEFT JOIN pmax_stats s
         ON cs.campaign_id = s.campaign_id
         AND cs.segments_date = s.date
+    WHERE cs.customer_id = ${dataform.projectConfig.vars.GOOGLE_ADS_CUSTOMER_ID}
+),
+-- Campaign-level metrics: one row per campaign/date (no fanout from clicks)
+campaign_metrics AS (
+    SELECT
+        ps.date,
+        ps.campaign_id,
+        ps.customer_id,
+        pc.campaign_name,
+        ps.impressions,
+        ps.clicks,
+        ps.spend,
+        coalesce(pconv.cmb, 0) as cmb,
+        coalesce(pconv.form, 0) as form,
+        coalesce(pconv.lead_ads, 0) as lead_ads,
+        coalesce(pconv.total_conversions, 0) as total_conversions
+    FROM pmax_stats ps
+    LEFT JOIN pmax_conversion_stats pconv
+        ON ps.campaign_id = pconv.campaign_id
+        AND ps.customer_id = pconv.customer_id
+        AND ps.date = pconv.date
+    LEFT JOIN pmax_campaign_base pc
+        ON ps.campaign_id = pc.campaign_id
+        AND ps.customer_id = pc.customer_id
 )
+-- Click-level rows: one row per gclid, only cost_per_click at this grain
 SELECT
     'Google Ads' AS Platform,
-    ps.date,
-    CAST(pc.campaign_id AS STRING) AS id,
-    pc.campaign_name AS campaign,
+    cwc.Date as date,
+    CAST(cm.campaign_id AS STRING) AS id,
+    cm.campaign_name AS campaign,
     pag.asset_group_name AS adset,
     CAST(pag.asset_group_id AS STRING) AS adset_id,
-    pag.asset_group_name AS ad, -- Using asset group name as ad name for PMax
-    CAST(pag.asset_group_id AS STRING) AS ad_id, -- Using asset group id as ad id for PMax
+    pag.asset_group_name AS ad,
+    CAST(pag.asset_group_id AS STRING) AS ad_id,
     pag.final_url,
     cwc.cost_per_click AS spend,
-    ps.impressions,
-    ps.clicks,
+    NULL AS impressions,  -- impressions are campaign-level, not per click
+    1 AS clicks,          -- each row is one click
     NULL AS link_clicks,
-    coalesce(pconv.cmb, 0) as cmb,
-    coalesce(pconv.form, 0) as form,
-    coalesce(pconv.lead_ads, 0) as lead_ads,
-    coalesce(pconv.total_conversions, 0) as total_conversions,
+    NULL AS cmb,
+    NULL AS form,
+    NULL AS lead_ads,
+    NULL AS total_conversions,
     cwc.Gclid
 FROM
-    pmax_stats ps
-LEFT JOIN pmax_conversion_stats pconv
-    ON ps.campaign_id = pconv.campaign_id
-    AND ps.customer_id = pconv.customer_id
-    AND ps.date = pconv.date
-LEFT JOIN pmax_campaign_base pc
-    ON ps.campaign_id = pc.campaign_id
-    AND ps.customer_id = pc.customer_id
+    clicks_with_cost cwc
+LEFT JOIN campaign_metrics cm
+    ON cwc.campaign_id = cm.campaign_id
+    AND cwc.Date = cm.date
 LEFT JOIN pmax_assetgroup_base pag
-    ON ps.campaign_id = pag.campaign_id
-LEFT JOIN clicks_with_cost cwc
-    ON ps.campaign_id = cwc.campaign_id
-    AND ps.date = cwc.Date
+    ON cwc.campaign_id = pag.campaign_id

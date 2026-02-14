@@ -111,6 +111,9 @@ clicks_with_cost AS (
         ${ref("ads_ClickStats_1534842056")} cs
 ),
 clicks_with_ad_details AS (
+    -- Each row = one click (gclid). Only per-click metrics are assigned here.
+    -- Aggregated metrics (impressions, total clicks, conversions) are NOT joined
+    -- to avoid fanout: N clicks x 1 stats row = N rows all carrying the full aggregate.
     SELECT
         cwc.Gclid,
         cwc.segments_date,
@@ -120,25 +123,16 @@ clicks_with_ad_details AS (
         ads.ad_group_ad_ad_id,
         ads.ad_name,
         ads.final_url,
-        stats.spend,       -- Total spend for this Ad on this Date
-        stats.impressions, -- Total impressions for this Ad on this Date
-        stats.clicks,      -- Total clicks for this Ad on this Date
-        conv.cmb,
-        conv.form,
-        conv.lead_ads,
-        conv.total_conversions
+        SAFE_DIVIDE(stats.spend, stats.clicks) AS cost_per_click,
+        1 AS clicks  -- each row is one click
     FROM
-        clicks_with_cost cwc -- Start from individual clicks
+        clicks_with_cost cwc
     LEFT JOIN ad_base ads
-        ON cwc.AdId = CAST(ads.ad_group_ad_ad_id AS STRING) -- Join on extracted AdId
+        ON cwc.AdId = CAST(ads.ad_group_ad_ad_id AS STRING)
     LEFT JOIN ad_stats stats
         ON ads.ad_group_ad_ad_id = stats.ad_group_ad_ad_id
         AND ads.customer_id = stats.customer_id
         AND cwc.segments_date = stats.date
-    LEFT JOIN ad_conversion_stats conv
-        ON ads.ad_group_ad_ad_id = conv.ad_group_ad_ad_id
-        AND ads.customer_id = conv.customer_id
-        AND cwc.segments_date = conv.date
 )
 SELECT
     'Google Ads' AS Platform,
@@ -148,16 +142,16 @@ SELECT
     ag.ad_group_name AS adset,
     CAST(ag.ad_group_id AS STRING) AS adset_id,
     clicks.ad_name AS ad,
-    CAST(clicks.AdId AS STRING) AS ad_id, -- Use extracted AdId
+    CAST(clicks.AdId AS STRING) AS ad_id,
     clicks.final_url,
-    SAFE_DIVIDE(clicks.spend, clicks.clicks) AS spend, -- Cost per click from aggregated spend
-    clicks.impressions,
+    clicks.cost_per_click AS spend,
+    NULL AS impressions,  -- impressions are ad-level aggregates, not per click
     clicks.clicks,
     NULL AS link_clicks,
-    coalesce(clicks.cmb, 0) as cmb,
-    coalesce(clicks.form, 0) as form,
-    coalesce(clicks.lead_ads, 0) as lead_ads,
-    coalesce(clicks.total_conversions, 0) as total_conversions,
+    NULL AS cmb,          -- conversions are ad-level aggregates, not per click
+    NULL AS form,
+    NULL AS lead_ads,
+    NULL AS total_conversions,
     clicks.Gclid
 FROM
     clicks_with_ad_details clicks

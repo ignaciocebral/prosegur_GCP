@@ -51,21 +51,75 @@ conversion_stats AS (
 ),
 
 customer_info AS (
-    SELECT 
+    SELECT
+      customer_id,
+      customer_descriptive_name,
+      CASE
+        WHEN customer_id = 4263469660 THEN 'Argentina'
+        WHEN customer_id = 9192320856 THEN 'Brasil'
+        WHEN customer_id = 2412701548 THEN 'Colombia'
+        WHEN customer_id = 3987648656 THEN 'Peru'
+        WHEN customer_id = 1703013237 THEN 'Espana'
+        WHEN customer_id = 9812854435 THEN 'Paraguay'
+        WHEN customer_id = 2407906005 THEN 'Chile'
+        WHEN customer_id = 8037331123 THEN 'Portugal'
+        ELSE 'Other'
+      END AS country_code
+    FROM (
+      SELECT
         customer_id,
         customer_descriptive_name,
-        CASE 
-            WHEN customer_id = 4263469660 THEN 'Argentina'
-            WHEN customer_id = 9192320856 THEN 'Brasil'
-            WHEN customer_id = 2412701548 THEN 'Colombia'
-            WHEN customer_id = 3987648656 THEN 'Peru'
-            WHEN customer_id = 1703013237 THEN 'Espana'
-            WHEN customer_id = 9812854435 THEN 'Paraguay'
-            WHEN customer_id = 2407906005 THEN 'Chile'
-            WHEN customer_id = 8037331123 THEN 'Portugal'
-            ELSE 'Other'
-        END as country_code
-    FROM ${ref("ads_Customer_1534842056")}
+        _LATEST_DATE,
+        _DATA_DATE,
+        ROW_NUMBER() OVER (
+          PARTITION BY customer_id
+          ORDER BY _LATEST_DATE DESC, _DATA_DATE DESC
+        ) AS rn
+      FROM ${ref("ads_Customer_1534842056")}
+    )
+    WHERE rn = 1
+),
+
+campaign_info AS (
+  SELECT
+    customer_id,
+    campaign_id,
+    campaign_name
+  FROM (
+    SELECT
+      customer_id,
+      campaign_id,
+      campaign_name,
+      _LATEST_DATE,
+      _DATA_DATE,
+      ROW_NUMBER() OVER (
+        PARTITION BY customer_id, campaign_id
+        ORDER BY _LATEST_DATE DESC, _DATA_DATE DESC
+      ) AS rn
+    FROM ${ref("ads_Campaign_1534842056")}
+  )
+  WHERE rn = 1
+),
+
+ad_group_info AS (
+  SELECT
+    customer_id,
+    ad_group_id,
+    ad_group_name
+  FROM (
+    SELECT
+      customer_id,
+      ad_group_id,
+      ad_group_name,
+      _LATEST_DATE,
+      _DATA_DATE,
+      ROW_NUMBER() OVER (
+        PARTITION BY customer_id, ad_group_id
+        ORDER BY _LATEST_DATE DESC, _DATA_DATE DESC
+      ) AS rn
+    FROM ${ref("ads_AdGroup_1534842056")}
+  )
+  WHERE rn = 1
 )
 
 SELECT
@@ -95,6 +149,10 @@ LEFT JOIN
 LEFT JOIN
   customer_info cust USING(customer_id)
 LEFT JOIN
-  ${ref("ads_Campaign_1534842056")} cmp ON s.campaign_id = cmp.campaign_id
+  campaign_info cmp
+  ON s.customer_id = cmp.customer_id
+  AND s.campaign_id = cmp.campaign_id
 LEFT JOIN
-  ${ref("ads_AdGroup_1534842056")} ag ON s.ad_group_id = ag.ad_group_id
+  ad_group_info ag
+  ON s.customer_id = ag.customer_id
+  AND s.ad_group_id = ag.ad_group_id

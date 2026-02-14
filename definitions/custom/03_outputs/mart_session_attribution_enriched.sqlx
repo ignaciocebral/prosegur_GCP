@@ -61,7 +61,7 @@ joined AS (
     ON b.session_gclid = g.gclid
     AND b.session_date = g.date
   LEFT JOIN meta_joined m
-    ON b.campaign_id = m.campaign_id
+    ON LOWER(TRIM(b.campaign)) = LOWER(TRIM(m.campaign_name))
     AND b.session_date = m.date
     AND LOWER(COALESCE(b.source, '')) = 'meta'
 )

@@ -135,15 +135,15 @@ const customConfig = {
   // assertions
   // id uniqueness checks
   ASSERTIONS_EVENT_ID_UNIQUENESS: false,
-  ASSERTIONS_SESSION_ID_UNIQUENESS: false,
+  ASSERTIONS_SESSION_ID_UNIQUENESS: true,
 
   // check for session durations and events look valid?
-  ASSERTIONS_SESSION_DURATION_VALIDITY: false,
-  ASSERTIONS_SESSIONS_VALIDITY: false, 
+  ASSERTIONS_SESSION_DURATION_VALIDITY: true,
+  ASSERTIONS_SESSIONS_VALIDITY: true,
   // check GA4 tables: are they on time?
-  ASSERTIONS_TABLES_TIMELINESS: false,
+  ASSERTIONS_TABLES_TIMELINESS: true,
   // check for a transaction IDs on a purchase?
-  ASSERTIONS_TRANSACTION_ID_COMPLETENESS: false,
+  ASSERTIONS_TRANSACTION_ID_COMPLETENESS: true,
   // check for cookies on all hits? (note: cookieless pings will trigger a fail)
   ASSERTIONS_USER_PSEUDO_ID_COMPLETENESS: false
 

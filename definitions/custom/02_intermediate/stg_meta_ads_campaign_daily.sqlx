@@ -9,7 +9,7 @@ Retention: Permanent - Required staging bridge for paid attribution enrichment.
 */
 
 js {
-  const targetProject = dataform.projectConfig.vars.TARGET_PROJECT || dataform.projectConfig.defaultProject;
+  const targetProject = dataform.projectConfig.vars.TARGET_PROJECT || dataform.projectConfig.defaultDatabase;
 }
 
 config {
