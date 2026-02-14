@@ -1,0 +1,46 @@
+/*
+"""
+Description: Extracts session-level attribution keys from ga4_sessions for deterministic paid-media joins.
+Author: Codex
+Date: 2026-02-14
+Purpose: Production
+Retention: Permanent - Core staging layer for session attribution enrichment.
+"""
+*/
+
+config {
+  type: "table",
+  schema: dataform.projectConfig.vars.TRANSFORMATIONS_DATASET,
+  tags: [dataform.projectConfig.vars.LABEL_EXECUTION_OPERATION, "attribution", "sessions"],
+  description: "Session-level key table used for deterministic attribution joins.",
+  bigquery: {
+    partitionBy: "session_date",
+    clusterBy: ["session_id", "session_gclid"]
+  }
+}
+
+SELECT
+  s.session_id,
+  s.session_date,
+  s.user_pseudo_id,
+  s.property_id,
+  s.session_source.source AS source,
+  s.session_source.medium AS medium,
+  s.session_source.campaign AS campaign,
+  s.session_source.campaign_id AS campaign_id,
+  s.session_source.term AS term,
+  s.session_source.content AS content,
+  s.session_source.default_channel_grouping AS default_channel_grouping,
+  s.session_source.gclid AS session_gclid,
+  s.session_source.dclid AS session_dclid,
+  s.session_source.srsltid AS session_srsltid,
+  s.session_source.gbraid AS session_gbraid,
+  s.session_source.wbraid AS session_wbraid,
+  s.session_source.msclkid AS session_msclkid,
+  s.last_non_direct_traffic_source.source AS lnd_source,
+  s.last_non_direct_traffic_source.medium AS lnd_medium,
+  s.last_non_direct_traffic_source.campaign AS lnd_campaign,
+  s.last_non_direct_traffic_source.campaign_id AS lnd_campaign_id,
+  s.last_non_direct_traffic_source.default_channel_grouping AS lnd_default_channel_grouping
+FROM ${ref("ga4_sessions")} s
+QUALIFY ROW_NUMBER() OVER (PARTITION BY s.session_id ORDER BY s.session_date DESC) = 1

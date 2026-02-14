@@ -1,0 +1,133 @@
+/*
+"""
+Description: Produces a session-grain attribution mart enriched with deterministic Google Ads and Meta Ads context.
+Author: Codex
+Date: 2026-02-14
+Purpose: Production
+Retention: Permanent - Primary output mart for paid attribution analysis.
+"""
+*/
+
+config {
+  type: "table",
+  schema: dataform.projectConfig.vars.OUTPUTS_DATASET,
+  tags: [dataform.projectConfig.vars.LABEL_EXECUTION_OPERATION, "attribution", "sessions", "mart"],
+  description: "Session-grain attribution mart with deterministic paid-media enrichment.",
+  bigquery: {
+    partitionBy: "session_date",
+    clusterBy: ["session_id", "source", "medium"]
+  }
+}
+
+WITH base AS (
+  SELECT * FROM ${ref("stg_ga4_session_keys")}
+),
+
+google_joined AS (
+  SELECT * FROM ${ref("stg_google_ads_session_bridge")}
+),
+
+meta_joined AS (
+  SELECT * FROM ${ref("stg_meta_ads_campaign_daily")}
+),
+
+joined AS (
+  SELECT
+    b.*,
+    g.gclid AS google_matched_gclid,
+    g.date AS google_matched_date,
+    g.customer_id AS google_customer_id,
+    g.account_name AS google_account_name,
+    g.campaign_id AS google_campaign_id,
+    g.campaign_name AS google_campaign_name,
+    g.ad_group_id AS google_ad_group_id,
+    g.ad_group_name AS google_ad_group_name,
+    g.impressions AS google_impressions,
+    g.clicks AS google_clicks,
+    g.spend AS google_spend,
+    m.date AS meta_matched_date,
+    m.ad_account_id AS meta_ad_account_id,
+    m.ad_account_name AS meta_ad_account_name,
+    m.campaign_id AS meta_campaign_id,
+    m.campaign_name AS meta_campaign_name,
+    m.adset_id AS meta_adset_id,
+    m.adset_name AS meta_adset_name,
+    m.impressions AS meta_impressions,
+    m.clicks AS meta_clicks,
+    m.link_clicks AS meta_link_clicks,
+    m.spend AS meta_spend
+  FROM base b
+  LEFT JOIN google_joined g
+    ON b.session_gclid = g.gclid
+    AND b.session_date = g.date
+  LEFT JOIN meta_joined m
+    ON b.campaign_id = m.campaign_id
+    AND b.session_date = m.date
+    AND LOWER(COALESCE(b.source, '')) = 'meta'
+)
+
+SELECT
+  CURRENT_TIMESTAMP() AS _run_timestamp,
+  session_id,
+  session_date,
+  user_pseudo_id,
+  property_id,
+  source,
+  medium,
+  campaign,
+  campaign_id,
+  term,
+  content,
+  default_channel_grouping,
+  session_gclid,
+  session_dclid,
+  session_srsltid,
+  session_gbraid,
+  session_wbraid,
+  session_msclkid,
+  lnd_source,
+  lnd_medium,
+  lnd_campaign,
+  lnd_campaign_id,
+  lnd_default_channel_grouping,
+  STRUCT(
+    CASE
+      WHEN google_matched_gclid IS NOT NULL THEN 'google_gclid'
+      WHEN meta_campaign_id IS NOT NULL THEN 'meta_campaign_id'
+      ELSE 'unmatched'
+    END AS attribution_source,
+    STRUCT(
+      google_matched_gclid IS NOT NULL AS is_matched,
+      google_matched_date AS matched_date,
+      google_customer_id AS customer_id,
+      google_account_name AS account_name,
+      google_campaign_id AS campaign_id,
+      google_campaign_name AS campaign_name,
+      google_ad_group_id AS ad_group_id,
+      google_ad_group_name AS ad_group_name,
+      COALESCE(google_impressions, 0) AS impressions,
+      COALESCE(google_clicks, 0) AS clicks,
+      COALESCE(google_spend, 0) AS spend
+    ) AS google_ads,
+    STRUCT(
+      meta_campaign_id IS NOT NULL AS is_matched,
+      meta_matched_date AS matched_date,
+      meta_ad_account_id AS ad_account_id,
+      meta_ad_account_name AS ad_account_name,
+      meta_campaign_id AS campaign_id,
+      meta_campaign_name AS campaign_name,
+      meta_adset_id AS adset_id,
+      meta_adset_name AS adset_name,
+      COALESCE(meta_impressions, 0) AS impressions,
+      COALESCE(meta_clicks, 0) AS clicks,
+      COALESCE(meta_link_clicks, 0) AS link_clicks,
+      COALESCE(meta_spend, 0) AS spend
+    ) AS meta_ads
+  ) AS paid_attribution
+FROM joined
+QUALIFY ROW_NUMBER() OVER (
+  PARTITION BY session_id
+  ORDER BY
+    IF(google_matched_gclid IS NOT NULL, 1, 0) DESC,
+    IF(meta_campaign_id IS NOT NULL, 1, 0) DESC
+) = 1
