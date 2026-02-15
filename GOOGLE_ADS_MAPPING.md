@@ -2,7 +2,7 @@
 
 | País / Entidad | Customer Name | Customer ID |
 | :--- | :--- | :--- |
-| **Alemania** | Prosegur Cash Alemania | `9589630427` |
+| **Alemania** | Prosegur Cash Alemania | `9589630427` | 
 | **Argentina** | Prosegur Cash Argentina | `4263469660` |
 | **Brasil** | Prosegur Cash Brasil | `9192320856` |
 | **Chile** | Prosegur Cash Chile | `2407906005` |
