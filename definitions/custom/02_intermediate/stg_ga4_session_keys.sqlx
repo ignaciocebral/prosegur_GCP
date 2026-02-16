@@ -31,7 +31,7 @@ SELECT
   s.session_source.term AS term,
   s.session_source.content AS content,
   s.session_source.default_channel_grouping AS default_channel_grouping,
-  s.session_source.gclid AS session_gclid,
+  COALESCE(s.session_source.gclid, s.last_non_direct_traffic_source.gclid) AS session_gclid,
   s.session_source.dclid AS session_dclid,
   s.session_source.srsltid AS session_srsltid,
   s.session_source.gbraid AS session_gbraid,

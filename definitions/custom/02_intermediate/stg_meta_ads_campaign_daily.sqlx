@@ -16,7 +16,7 @@ config {
   type: "table",
   schema: dataform.projectConfig.vars.TRANSFORMATIONS_DATASET,
   tags: [dataform.projectConfig.vars.LABEL_EXECUTION_OPERATION, "attribution", "meta_ads"],
-  description: "Meta Ads campaign daily bridge with one row per CampaignId and DateStart.",
+  description: "Meta Ads campaign daily bridge with one row per campaign_id and date, including conversions.",
   bigquery: {
     partitionBy: "date",
     clusterBy: ["campaign_id"]
@@ -25,20 +25,25 @@ config {
 
 WITH src AS (
   SELECT
-    DateStart AS date,
-    AdAccountId AS ad_account_id,
-    AdAccountName AS ad_account_name,
-    CampaignId AS campaign_id,
-    CampaignName AS campaign_name,
-    AdSetId AS adset_id,
-    AdSetName AS adset_name,
-    CAST(COALESCE(Impressions, 0) AS INT64) AS impressions,
-    CAST(COALESCE(Clicks, 0) AS INT64) AS clicks,
-    CAST(COALESCE(Spend, 0) AS NUMERIC) AS spend,
-    CAST(COALESCE(LinkClicks, 0) AS INT64) AS link_clicks
-  FROM `${targetProject}.meta_global_transfer.AdInsights`
-  WHERE CampaignId IS NOT NULL
-    AND DateStart IS NOT NULL
+    date,
+    account AS ad_account_name,
+    campaign_id,
+    campaign_name,
+    adset_id,
+    adset_name,
+    COALESCE(impressions, 0) AS impressions,
+    COALESCE(clicks, 0) AS clicks,
+    COALESCE(spend, 0) AS spend,
+    COALESCE((SELECT a.count FROM UNNEST(actions) a WHERE a.name = 'link_click' LIMIT 1), 0) AS link_clicks,
+    -- Conversiones Meta
+    COALESCE((SELECT SUM(c.count) FROM UNNEST(conversions) c WHERE LOWER(c.name) LIKE '%cmb%'), 0) AS conversions_cmb,
+    COALESCE((SELECT SUM(c.count) FROM UNNEST(conversions) c WHERE c.name IN ('offsite_conversion.fb_pixel_custom.Form', 'offsite_conversion.fb_pixel_custom.form', 'offsite_conversion.fb_pixel_custom.Formulario Contacto')), 0) AS conversions_form,
+    COALESCE((SELECT SUM(c.count) FROM UNNEST(conversions) c WHERE c.name = 'offsite_conversion.fb_pixel_custom.Cualificado'), 0) AS conversions_cualificado,
+    COALESCE((SELECT SUM(c.count) FROM UNNEST(conversions) c WHERE c.name = 'contact_total'), 0) AS conversions_contact,
+    COALESCE((SELECT SUM(c.count) FROM UNNEST(conversions) c), 0) AS conversions_total
+  FROM `${targetProject}.meta_api_insights.ad_insights`
+  WHERE campaign_id IS NOT NULL
+    AND date IS NOT NULL
 ),
 
 campaign_daily AS (
@@ -46,12 +51,16 @@ campaign_daily AS (
     date,
     campaign_id,
     ANY_VALUE(campaign_name) AS campaign_name,
-    ANY_VALUE(ad_account_id) AS ad_account_id,
     ANY_VALUE(ad_account_name) AS ad_account_name,
     SUM(impressions) AS impressions,
     SUM(clicks) AS clicks,
     SUM(link_clicks) AS link_clicks,
-    SUM(spend) AS spend
+    SUM(spend) AS spend,
+    SUM(conversions_cmb) AS conversions_cmb,
+    SUM(conversions_form) AS conversions_form,
+    SUM(conversions_cualificado) AS conversions_cualificado,
+    SUM(conversions_contact) AS conversions_contact,
+    SUM(conversions_total) AS conversions_total
   FROM src
   GROUP BY 1, 2
 ),
@@ -73,7 +82,6 @@ top_adset AS (
 
 SELECT
   c.date,
-  c.ad_account_id,
   c.ad_account_name,
   c.campaign_id,
   c.campaign_name,
@@ -82,7 +90,12 @@ SELECT
   c.impressions,
   c.clicks,
   c.link_clicks,
-  c.spend
+  c.spend,
+  c.conversions_cmb,
+  c.conversions_form,
+  c.conversions_cualificado,
+  c.conversions_contact,
+  c.conversions_total
 FROM campaign_daily c
 LEFT JOIN top_adset t
   ON c.date = t.date

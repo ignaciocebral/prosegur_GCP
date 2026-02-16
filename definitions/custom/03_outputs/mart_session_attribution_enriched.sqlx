@@ -46,7 +46,6 @@ joined AS (
     g.clicks AS google_clicks,
     g.spend AS google_spend,
     m.date AS meta_matched_date,
-    m.ad_account_id AS meta_ad_account_id,
     m.ad_account_name AS meta_ad_account_name,
     m.campaign_id AS meta_campaign_id,
     m.campaign_name AS meta_campaign_name,
@@ -55,7 +54,12 @@ joined AS (
     m.impressions AS meta_impressions,
     m.clicks AS meta_clicks,
     m.link_clicks AS meta_link_clicks,
-    m.spend AS meta_spend
+    m.spend AS meta_spend,
+    m.conversions_cmb AS meta_conversions_cmb,
+    m.conversions_form AS meta_conversions_form,
+    m.conversions_cualificado AS meta_conversions_cualificado,
+    m.conversions_contact AS meta_conversions_contact,
+    m.conversions_total AS meta_conversions_total
   FROM base b
   LEFT JOIN google_joined g
     ON b.session_gclid = g.gclid
@@ -112,7 +116,6 @@ SELECT
     STRUCT(
       meta_campaign_id IS NOT NULL AS is_matched,
       meta_matched_date AS matched_date,
-      meta_ad_account_id AS ad_account_id,
       meta_ad_account_name AS ad_account_name,
       meta_campaign_id AS campaign_id,
       meta_campaign_name AS campaign_name,
@@ -121,7 +124,12 @@ SELECT
       COALESCE(meta_impressions, 0) AS impressions,
       COALESCE(meta_clicks, 0) AS clicks,
       COALESCE(meta_link_clicks, 0) AS link_clicks,
-      COALESCE(meta_spend, 0) AS spend
+      COALESCE(meta_spend, 0) AS spend,
+      COALESCE(meta_conversions_cmb, 0) AS conversions_cmb,
+      COALESCE(meta_conversions_form, 0) AS conversions_form,
+      COALESCE(meta_conversions_cualificado, 0) AS conversions_cualificado,
+      COALESCE(meta_conversions_contact, 0) AS conversions_contact,
+      COALESCE(meta_conversions_total, 0) AS conversions_total
     ) AS meta_ads
   ) AS paid_attribution
 FROM joined
