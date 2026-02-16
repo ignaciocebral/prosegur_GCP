@@ -65,9 +65,12 @@ joined AS (
     ON b.session_gclid = g.gclid
     AND b.session_date = g.date
   LEFT JOIN meta_joined m
-    ON LOWER(TRIM(b.campaign)) = LOWER(TRIM(m.campaign_name))
-    AND b.session_date = m.date
-    AND LOWER(COALESCE(b.source, '')) = 'meta'
+    ON b.session_date = m.date
+    AND LOWER(COALESCE(b.source, '')) IN ('meta', 'facebook', 'fb', 'ig', 'instagram', 'facebook.com', 'l.facebook.com', 'lm.facebook.com')
+    AND (
+      LOWER(TRIM(b.campaign)) = LOWER(TRIM(m.campaign_name))
+      OR CAST(b.campaign_id AS STRING) = CAST(m.campaign_id AS STRING)
+    )
 )
 
 SELECT

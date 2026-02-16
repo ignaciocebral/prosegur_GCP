@@ -1,37 +1,35 @@
 /*
 """
-Description: Aggregates Meta Ads performance to one row per campaign and date for deterministic session joins.
+Description: Standalone Meta Ads performance mart. One row per ad_account_name + campaign_id + date.
+             Does NOT depend on GA4 sessions. Includes reach/frequency from campaign_insights.
 Author: Codex
-Date: 2026-02-14
+Date: 2026-02-16
 Purpose: Production
-Retention: Permanent - Required staging bridge for paid attribution enrichment.
+Retention: Permanent - Primary output mart for Meta Ads investment and platform conversion analysis.
 """
 */
 
 config {
   type: "table",
-  schema: dataform.projectConfig.vars.TRANSFORMATIONS_DATASET,
-  tags: [dataform.projectConfig.vars.LABEL_EXECUTION_OPERATION, "attribution", "meta_ads"],
-  description: "Meta Ads campaign daily bridge with one row per campaign_id and date, including conversions.",
+  schema: dataform.projectConfig.vars.OUTPUTS_DATASET,
+  tags: [dataform.projectConfig.vars.LABEL_EXECUTION_OPERATION, "meta_ads", "performance", "mart"],
+  description: "Meta Ads performance mart at campaign+date grain. All ad accounts, no session dependency.",
   bigquery: {
     partitionBy: "date",
     clusterBy: ["campaign_id"]
   }
 }
 
-WITH src AS (
+WITH ad_level AS (
   SELECT
     date,
     account AS ad_account_name,
     campaign_id,
     campaign_name,
-    adset_id,
-    adset_name,
     COALESCE(impressions, 0) AS impressions,
     COALESCE(clicks, 0) AS clicks,
     COALESCE(spend, 0) AS spend,
     COALESCE((SELECT a.count FROM UNNEST(actions) a WHERE a.name = 'link_click' LIMIT 1), 0) AS link_clicks,
-    -- Conversiones Meta
     COALESCE((SELECT SUM(c.count) FROM UNNEST(conversions) c WHERE LOWER(c.name) LIKE '%cmb%'), 0) AS conversions_cmb,
     COALESCE((SELECT SUM(c.count) FROM UNNEST(conversions) c WHERE c.name IN ('offsite_conversion.fb_pixel_custom.Form', 'offsite_conversion.fb_pixel_custom.form', 'offsite_conversion.fb_pixel_custom.Formulario Contacto')), 0) AS conversions_form,
     COALESCE((SELECT SUM(c.count) FROM UNNEST(conversions) c WHERE c.name = 'offsite_conversion.fb_pixel_custom.Cualificado'), 0) AS conversions_cualificado,
@@ -45,9 +43,9 @@ WITH src AS (
 campaign_daily AS (
   SELECT
     date,
+    ANY_VALUE(ad_account_name) AS ad_account_name,
     campaign_id,
     ANY_VALUE(campaign_name) AS campaign_name,
-    ANY_VALUE(ad_account_name) AS ad_account_name,
     SUM(impressions) AS impressions,
     SUM(clicks) AS clicks,
     SUM(link_clicks) AS link_clicks,
@@ -57,55 +55,38 @@ campaign_daily AS (
     SUM(conversions_cualificado) AS conversions_cualificado,
     SUM(conversions_contact) AS conversions_contact,
     SUM(conversions_total) AS conversions_total
-  FROM src
-  GROUP BY 1, 2
+  FROM ad_level
+  GROUP BY 1, 3
 ),
 
-top_adset AS (
+campaign_reach AS (
   SELECT
     date,
     campaign_id,
-    adset_id,
-    adset_name,
-    SUM(spend) AS adset_spend,
-    ROW_NUMBER() OVER (
-      PARTITION BY date, campaign_id
-      ORDER BY SUM(spend) DESC, adset_id DESC
-    ) AS rn
-  FROM src
-  GROUP BY 1, 2, 3, 4
+    COALESCE(reach, 0) AS reach,
+    COALESCE(frequency, 0) AS frequency
+  FROM ${ref("campaign_insights")}
+  WHERE campaign_id IS NOT NULL
+    AND date IS NOT NULL
 )
 
 SELECT
   c.date,
   c.ad_account_name,
-  CASE
-    WHEN LOWER(c.ad_account_name) LIKE '%argentin%' THEN 'Argentina'
-    WHEN LOWER(c.ad_account_name) LIKE '%brasil%' OR LOWER(c.ad_account_name) LIKE '%brazil%' THEN 'Brasil'
-    WHEN LOWER(c.ad_account_name) LIKE '%chile%' THEN 'Chile'
-    WHEN LOWER(c.ad_account_name) LIKE '%colomb%' THEN 'Colombia'
-    WHEN LOWER(c.ad_account_name) LIKE '%espan%' OR LOWER(c.ad_account_name) LIKE '%spain%' THEN 'Espana'
-    WHEN LOWER(c.ad_account_name) LIKE '%paragua%' THEN 'Paraguay'
-    WHEN LOWER(c.ad_account_name) LIKE '%peru%' OR LOWER(c.ad_account_name) LIKE '%perú%' THEN 'Peru'
-    WHEN LOWER(c.ad_account_name) LIKE '%portug%' THEN 'Portugal'
-    WHEN LOWER(c.ad_account_name) LIKE '%aleman%' OR LOWER(c.ad_account_name) LIKE '%german%' THEN 'Alemania'
-    ELSE 'Other'
-  END AS country_code,
   c.campaign_id,
   c.campaign_name,
-  t.adset_id,
-  t.adset_name,
   c.impressions,
   c.clicks,
   c.link_clicks,
   c.spend,
+  COALESCE(r.reach, 0) AS reach,
+  COALESCE(r.frequency, 0) AS frequency,
   c.conversions_cmb,
   c.conversions_form,
   c.conversions_cualificado,
   c.conversions_contact,
   c.conversions_total
 FROM campaign_daily c
-LEFT JOIN top_adset t
-  ON c.date = t.date
-  AND c.campaign_id = t.campaign_id
-  AND t.rn = 1
+LEFT JOIN campaign_reach r
+  ON c.date = r.date
+  AND c.campaign_id = r.campaign_id

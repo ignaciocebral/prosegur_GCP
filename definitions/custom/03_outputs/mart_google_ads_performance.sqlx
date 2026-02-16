@@ -1,0 +1,40 @@
+/*
+"""
+Description: Standalone Google Ads performance mart. One row per customer_id + campaign_id + ad_group_id + date.
+             Does NOT depend on GA4 sessions. Includes ALL customer_ids from the MCC for cross-country visibility.
+Author: Codex
+Date: 2026-02-16
+Purpose: Production
+Retention: Permanent - Primary output mart for Google Ads investment and platform conversion analysis.
+"""
+*/
+
+config {
+  type: "table",
+  schema: dataform.projectConfig.vars.OUTPUTS_DATASET,
+  tags: [dataform.projectConfig.vars.LABEL_EXECUTION_OPERATION, "google_ads", "performance", "mart"],
+  description: "Google Ads performance mart at ad_group+date grain. All customer_ids from MCC, no session dependency.",
+  bigquery: {
+    partitionBy: "date",
+    clusterBy: ["customer_id", "campaign_id"]
+  }
+}
+
+SELECT
+  date,
+  country_code,
+  customer_id,
+  customer_descriptive_name AS customer_name,
+  campaign_id,
+  campaign_name,
+  ad_group_id,
+  ad_group_name,
+  impressions,
+  clicks,
+  cost,
+  conversions_form,
+  conversions_call,
+  conversions_crm,
+  conversions_total,
+  conversions_value_total
+FROM ${ref("stg_ads_performance")}
