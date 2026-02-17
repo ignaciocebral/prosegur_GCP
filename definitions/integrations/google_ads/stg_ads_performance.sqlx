@@ -2,7 +2,7 @@ config {
   type: "table",
   schema: dataform.projectConfig.vars.TRANSFORMATIONS_DATASET,
   tags: ["marketing", "google_ads"],
-  description: "Daily performance metrics at ad-level grain (ad_group for PMax). Includes all conversion funnel stages and ad quality attributes.",
+  description: "Daily performance metrics at ad-level grain (campaign-level for PMax). Includes all conversion funnel stages and ad quality attributes.",
   bigquery: {
     partitionBy: "date",
     clusterBy: ["customer_id", "campaign_id"]
@@ -58,19 +58,19 @@ basic_stats AS (
 
   UNION ALL
 
-  -- PMax campaigns: ad_group-level granularity (no ads)
+  -- PMax campaigns: campaign-level granularity (no ad_groups/ads in Data Transfer)
   SELECT
-    ag.segments_date AS date,
-    ag.customer_id,
-    ag.campaign_id,
-    ag.ad_group_id,
+    cbs.segments_date AS date,
+    cbs.customer_id,
+    cbs.campaign_id,
+    CAST(NULL AS INT64) AS ad_group_id,
     CAST(NULL AS INT64) AS ad_id,
-    SUM(ag.metrics_impressions) AS impressions,
-    SUM(ag.metrics_clicks) AS clicks,
-    SUM(ag.metrics_cost_micros) / 1000000 AS cost
-  FROM ${ref("ads_AdGroupStats_1534842056")} ag
+    SUM(cbs.metrics_impressions) AS impressions,
+    SUM(cbs.metrics_clicks) AS clicks,
+    SUM(cbs.metrics_cost_micros) / 1000000 AS cost
+  FROM ${ref("ads_CampaignBasicStats_1534842056")} cbs
   INNER JOIN campaign_info ci
-    ON ag.customer_id = ci.customer_id AND ag.campaign_id = ci.campaign_id
+    ON cbs.customer_id = ci.customer_id AND cbs.campaign_id = ci.campaign_id
   WHERE ci.campaign_advertising_channel_type = 'PERFORMANCE_MAX'
   GROUP BY 1, 2, 3, 4, 5
 ),
@@ -116,31 +116,31 @@ conversion_stats AS (
 
   UNION ALL
 
-  -- PMax: ad_group-level conversions
+  -- PMax: campaign-level conversions (no ad_groups/ads in Data Transfer)
   SELECT
-    agc.segments_date AS date,
-    agc.customer_id,
-    agc.campaign_id,
-    agc.ad_group_id,
+    ccs.segments_date AS date,
+    ccs.customer_id,
+    ccs.campaign_id,
+    CAST(NULL AS INT64) AS ad_group_id,
     CAST(NULL AS INT64) AS ad_id,
-    SUM(CASE WHEN agc.segments_conversion_action_name LIKE '%Cualificado%'
-              OR agc.segments_conversion_action_name LIKE '%Positivo%'
-              OR agc.segments_conversion_action_name = 'Formulario_04'
-         THEN agc.metrics_conversions ELSE 0 END) AS conversions_crm,
-    SUM(CASE WHEN agc.segments_conversion_action_name IN ('Form', 'Website lead', 'Envío de formulario para clientes potenciales', 'Lead form - Submit', 'Formularios')
-         THEN agc.metrics_conversions ELSE 0 END) AS conversions_form,
-    SUM(CASE WHEN agc.segments_conversion_action_name IN ('CMB', 'Llamadas desde anuncios (GAds)', 'Llamadas a teléfono en sitio web (desvío de llamada)', 'Clics en el número de teléfono en tu sitio web móvi (C2C)', 'C2C')
-         THEN agc.metrics_conversions ELSE 0 END) AS conversions_call,
-    SUM(CASE WHEN agc.segments_conversion_action_name LIKE '%Visita%'
-         THEN agc.metrics_conversions ELSE 0 END) AS conversions_visita,
-    SUM(CASE WHEN agc.segments_conversion_action_name LIKE '%No Gestionado%'
-              OR agc.segments_conversion_action_name LIKE '%NoGestionado%'
-         THEN agc.metrics_conversions ELSE 0 END) AS conversions_no_gestionado,
-    SUM(agc.metrics_conversions) AS conversions_total,
-    SUM(agc.metrics_conversions_value) AS conversions_value_total
-  FROM ${ref("ads_AdGroupConversionStats_1534842056")} agc
+    SUM(CASE WHEN ccs.segments_conversion_action_name LIKE '%Cualificado%'
+              OR ccs.segments_conversion_action_name LIKE '%Positivo%'
+              OR ccs.segments_conversion_action_name = 'Formulario_04'
+         THEN ccs.metrics_conversions ELSE 0 END) AS conversions_crm,
+    SUM(CASE WHEN ccs.segments_conversion_action_name IN ('Form', 'Website lead', 'Envío de formulario para clientes potenciales', 'Lead form - Submit', 'Formularios')
+         THEN ccs.metrics_conversions ELSE 0 END) AS conversions_form,
+    SUM(CASE WHEN ccs.segments_conversion_action_name IN ('CMB', 'Llamadas desde anuncios (GAds)', 'Llamadas a teléfono en sitio web (desvío de llamada)', 'Clics en el número de teléfono en tu sitio web móvi (C2C)', 'C2C')
+         THEN ccs.metrics_conversions ELSE 0 END) AS conversions_call,
+    SUM(CASE WHEN ccs.segments_conversion_action_name LIKE '%Visita%'
+         THEN ccs.metrics_conversions ELSE 0 END) AS conversions_visita,
+    SUM(CASE WHEN ccs.segments_conversion_action_name LIKE '%No Gestionado%'
+              OR ccs.segments_conversion_action_name LIKE '%NoGestionado%'
+         THEN ccs.metrics_conversions ELSE 0 END) AS conversions_no_gestionado,
+    SUM(ccs.metrics_conversions) AS conversions_total,
+    SUM(ccs.metrics_conversions_value) AS conversions_value_total
+  FROM ${ref("ads_CampaignConversionStats_1534842056")} ccs
   INNER JOIN campaign_info ci
-    ON agc.customer_id = ci.customer_id AND agc.campaign_id = ci.campaign_id
+    ON ccs.customer_id = ci.customer_id AND ccs.campaign_id = ci.campaign_id
   WHERE ci.campaign_advertising_channel_type = 'PERFORMANCE_MAX'
   GROUP BY 1, 2, 3, 4, 5
 ),
@@ -264,7 +264,7 @@ LEFT JOIN
   ON s.date = c.date
   AND s.customer_id = c.customer_id
   AND s.campaign_id = c.campaign_id
-  AND s.ad_group_id = c.ad_group_id
+  AND COALESCE(CAST(s.ad_group_id AS STRING), '__NULL__') = COALESCE(CAST(c.ad_group_id AS STRING), '__NULL__')
   AND COALESCE(CAST(s.ad_id AS STRING), '__NULL__') = COALESCE(CAST(c.ad_id AS STRING), '__NULL__')
 LEFT JOIN
   customer_info cust USING(customer_id)
