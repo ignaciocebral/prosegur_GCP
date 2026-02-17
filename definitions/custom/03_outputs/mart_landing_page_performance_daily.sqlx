@@ -1,0 +1,125 @@
+/*
+"""
+Description: Landing page performance mart aggregated by date, page path, channel, source, and medium.
+             Covers ALL channels (paid, organic, referral, direct, etc.) for complete page analysis.
+Author: Codex
+Date: 2026-02-16
+Purpose: Production
+Retention: Permanent - Output mart for landing page conversion analysis across all channels.
+"""
+*/
+
+config {
+  type: "table",
+  schema: dataform.projectConfig.vars.OUTPUTS_DATASET,
+  tags: [dataform.projectConfig.vars.LABEL_EXECUTION_OPERATION, "landing_pages", "performance", "mart"],
+  description: "Landing page performance aggregated across ALL channels. Engagement rate, bounce rate, and conversion metrics by page path, channel, source/medium, device, and country.",
+  bigquery: {
+    partitionBy: "session_date",
+    clusterBy: ["landing_page_path", "default_channel_grouping"]
+  }
+}
+
+-- CTE 1: Session-level data with conversions
+WITH session_with_conversions AS (
+  SELECT
+    s.session_date,
+    s.session_id,
+    s.user_pseudo_id,
+    s.ga_session_number,
+    s.session_info.is_engaged_session,
+    s.device.category AS device_category,
+    s.geo.country,
+    s.landing_page.landing_page_path,
+    s.landing_page.landing_content_group,
+    s.last_non_direct_traffic_source.default_channel_grouping AS default_channel_grouping,
+    s.last_non_direct_traffic_source.source AS source,
+    s.last_non_direct_traffic_source.medium AS medium,
+    s.last_non_direct_traffic_source.campaign AS campaign,
+    s.time.engagement_time_msec,
+
+    -- Conversion counts per session (same regex patterns as demo_daily_sessions_report)
+    COUNTIF(REGEXP_CONTAINS(LOWER(e.event_name), r'cmb')) AS cmb,
+    COUNTIF(
+      REGEXP_CONTAINS(LOWER(e.event_name), r'form')
+      AND NOT REGEXP_CONTAINS(LOWER(e.event_name), r'formulario')
+    ) AS form,
+    COUNTIF(REGEXP_CONTAINS(LOWER(e.event_name), r'c2c')) AS c2c,
+    COUNTIF(e.event_name = 'generate_lead') AS generate_lead,
+    COUNTIF(e.event_name = 'page_view') AS page_views
+
+  FROM ${ref("ga4_sessions")} s
+  LEFT JOIN ${ref("ga4_events")} e
+    ON s.session_id = e.session_id
+    AND (
+      REGEXP_CONTAINS(LOWER(e.event_name), r'(page_view|cmb|form|c2c)')
+      AND NOT REGEXP_CONTAINS(LOWER(e.event_name), r'formulario')
+      OR e.event_name = 'generate_lead'
+    )
+  GROUP BY ALL
+),
+
+-- CTE 2: Daily aggregation by landing page, channel, source, medium
+daily_aggregation AS (
+  SELECT
+    session_date,
+    landing_page_path,
+    landing_content_group,
+    COALESCE(default_channel_grouping, 'Direct') AS default_channel_grouping,
+    IFNULL(source, '(not set)') AS source,
+    IFNULL(medium, '(not set)') AS medium,
+    IFNULL(campaign, '(not set)') AS campaign,
+    device_category,
+    country,
+
+    COUNT(DISTINCT session_id) AS sessions,
+    COUNT(DISTINCT user_pseudo_id) AS users,
+    COUNT(DISTINCT IF(ga_session_number = 1, session_id, NULL)) AS new_sessions,
+    COUNT(DISTINCT IF(is_engaged_session, session_id, NULL)) AS engaged_sessions,
+
+    SUM(cmb) AS cmb,
+    SUM(form) AS form,
+    SUM(c2c) AS c2c,
+    SUM(generate_lead) AS generate_lead,
+    SUM(page_views) AS page_views,
+
+    AVG(engagement_time_msec) AS avg_engagement_time_msec
+
+  FROM session_with_conversions
+  GROUP BY ALL
+)
+
+SELECT
+  CURRENT_TIMESTAMP() AS _run_timestamp,
+  session_date,
+  landing_page_path,
+  landing_content_group,
+  default_channel_grouping,
+  source,
+  medium,
+  campaign,
+  device_category,
+  country,
+
+  sessions,
+  users,
+  new_sessions,
+  engaged_sessions,
+  page_views,
+
+  -- Conversions
+  cmb,
+  form,
+  c2c,
+  generate_lead,
+  (cmb + form + c2c + generate_lead) AS total_conversions,
+
+  avg_engagement_time_msec,
+
+  -- Calculated metrics
+  SAFE_DIVIDE(engaged_sessions, sessions) AS engagement_rate,
+  1 - SAFE_DIVIDE(engaged_sessions, sessions) AS bounce_rate,
+  SAFE_DIVIDE(generate_lead, sessions) AS lead_conversion_rate,
+  SAFE_DIVIDE(cmb + form + c2c + generate_lead, sessions) AS total_conversion_rate
+
+FROM daily_aggregation

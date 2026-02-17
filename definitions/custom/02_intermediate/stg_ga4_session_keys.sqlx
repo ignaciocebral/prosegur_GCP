@@ -37,6 +37,8 @@ SELECT
   s.session_source.gbraid AS session_gbraid,
   s.session_source.wbraid AS session_wbraid,
   s.session_source.msclkid AS session_msclkid,
+  s.session_info.is_engaged_session,
+  s.ga_session_number,
   s.last_non_direct_traffic_source.source AS lnd_source,
   s.last_non_direct_traffic_source.medium AS lnd_medium,
   s.last_non_direct_traffic_source.campaign AS lnd_campaign,

@@ -13,7 +13,7 @@ config {
   type: "table",
   schema: dataform.projectConfig.vars.OUTPUTS_DATASET,
   tags: [dataform.projectConfig.vars.LABEL_EXECUTION_OPERATION, "meta_ads", "performance", "mart"],
-  description: "Meta Ads performance mart at campaign+date grain. All ad accounts, no session dependency.",
+  description: "Standalone Meta Ads performance at campaign+date grain with reach/frequency. Use for Meta-specific analysis.",
   bigquery: {
     partitionBy: "date",
     clusterBy: ["campaign_id"]

@@ -12,7 +12,7 @@ config {
   type: "table",
   schema: dataform.projectConfig.vars.OUTPUTS_DATASET,
   tags: [dataform.projectConfig.vars.LABEL_EXECUTION_OPERATION, "attribution", "sessions", "mart"],
-  description: "Session-grain attribution mart with deterministic paid-media enrichment.",
+  description: "Session-grain attribution mart with deterministic paid-media enrichment (gclid for Google, campaign_id for Meta). Includes keyword data from ClickStats. Use for session-level deep dives and landing page analysis.",
   bigquery: {
     partitionBy: "session_date",
     clusterBy: ["session_id", "source", "medium"]
@@ -42,6 +42,9 @@ joined AS (
     g.campaign_name AS google_campaign_name,
     g.ad_group_id AS google_ad_group_id,
     g.ad_group_name AS google_ad_group_name,
+    g.keyword_text AS google_keyword_text,
+    g.keyword_match_text AS google_keyword_match_text,
+    g.keyword_match_type AS google_keyword_match_type,
     g.impressions AS google_impressions,
     g.clicks AS google_clicks,
     g.spend AS google_spend,
@@ -112,6 +115,9 @@ SELECT
       google_campaign_name AS campaign_name,
       google_ad_group_id AS ad_group_id,
       google_ad_group_name AS ad_group_name,
+      google_keyword_text AS keyword_text,
+      google_keyword_match_text AS keyword_match_text,
+      google_keyword_match_type AS keyword_match_type,
       COALESCE(google_impressions, 0) AS impressions,
       COALESCE(google_clicks, 0) AS clicks,
       COALESCE(google_spend, 0) AS spend

@@ -2,54 +2,182 @@ config {
   type: "table",
   schema: dataform.projectConfig.vars.TRANSFORMATIONS_DATASET,
   tags: ["marketing", "google_ads"],
-  description: "Daily performance metrics (Cost, Impressions, Clicks) and Conversions by AdGroup and Conversion Type.",
+  description: "Daily performance metrics at ad-level grain (ad_group for PMax). Includes all conversion funnel stages and ad quality attributes.",
   bigquery: {
     partitionBy: "date",
     clusterBy: ["customer_id", "campaign_id"]
   }
 }
 
-WITH basic_stats AS (
+-- ============================================================================
+-- Campaign info with advertising_channel_type to detect PMax
+-- ============================================================================
+WITH campaign_info AS (
   SELECT
-    segments_date AS date,
     customer_id,
     campaign_id,
-    ad_group_id,
-    SUM(metrics_impressions) AS impressions,
-    SUM(metrics_clicks) AS clicks,
-    SUM(metrics_cost_micros) / 1000000 AS cost
-  FROM
-    ${ref("ads_AdGroupStats_1534842056")}
-  GROUP BY
-    1, 2, 3, 4
+    campaign_name,
+    campaign_advertising_channel_type
+  FROM (
+    SELECT
+      customer_id,
+      campaign_id,
+      campaign_name,
+      campaign_advertising_channel_type,
+      _LATEST_DATE,
+      _DATA_DATE,
+      ROW_NUMBER() OVER (
+        PARTITION BY customer_id, campaign_id
+        ORDER BY _LATEST_DATE DESC, _DATA_DATE DESC
+      ) AS rn
+    FROM ${ref("ads_Campaign_1534842056")}
+  )
+  WHERE rn = 1
 ),
 
+-- ============================================================================
+-- Basic stats: Ad-level for non-PMax, AdGroup-level for PMax
+-- ============================================================================
+basic_stats AS (
+  -- Non-PMax campaigns: ad-level granularity
+  SELECT
+    a.segments_date AS date,
+    a.customer_id,
+    a.campaign_id,
+    a.ad_group_id,
+    a.ad_group_ad_ad_id AS ad_id,
+    SUM(a.metrics_impressions) AS impressions,
+    SUM(a.metrics_clicks) AS clicks,
+    SUM(a.metrics_cost_micros) / 1000000 AS cost
+  FROM ${ref("ads_AdBasicStats_1534842056")} a
+  INNER JOIN campaign_info ci
+    ON a.customer_id = ci.customer_id AND a.campaign_id = ci.campaign_id
+  WHERE ci.campaign_advertising_channel_type != 'PERFORMANCE_MAX'
+     OR ci.campaign_advertising_channel_type IS NULL
+  GROUP BY 1, 2, 3, 4, 5
+
+  UNION ALL
+
+  -- PMax campaigns: ad_group-level granularity (no ads)
+  SELECT
+    ag.segments_date AS date,
+    ag.customer_id,
+    ag.campaign_id,
+    ag.ad_group_id,
+    CAST(NULL AS INT64) AS ad_id,
+    SUM(ag.metrics_impressions) AS impressions,
+    SUM(ag.metrics_clicks) AS clicks,
+    SUM(ag.metrics_cost_micros) / 1000000 AS cost
+  FROM ${ref("ads_AdGroupStats_1534842056")} ag
+  INNER JOIN campaign_info ci
+    ON ag.customer_id = ci.customer_id AND ag.campaign_id = ci.campaign_id
+  WHERE ci.campaign_advertising_channel_type = 'PERFORMANCE_MAX'
+  GROUP BY 1, 2, 3, 4, 5
+),
+
+-- ============================================================================
+-- Conversion stats: Ad-level for non-PMax, AdGroup-level for PMax
+-- ============================================================================
 conversion_stats AS (
+  -- Non-PMax: ad-level conversions
   SELECT
-    segments_date AS date,
-    customer_id,
-    campaign_id,
-    ad_group_id,
-    -- Pivot Conversions based on Action Name
-    -- CRM: Cualificado, Positivo, Formulario_04
-    SUM(CASE WHEN segments_conversion_action_name LIKE '%Cualificado%' OR segments_conversion_action_name LIKE '%Positivo%' OR segments_conversion_action_name = 'Formulario_04' THEN metrics_conversions ELSE 0 END) AS conversions_crm,
-    
-    -- Form: Form, Website lead, Envío de formulario..., Lead form - Submit, Formularios
-    -- Excluded 'Formulario_04' as it is now in CRM
-    SUM(CASE WHEN segments_conversion_action_name IN ('Form', 'Website lead', 'Envío de formulario para clientes potenciales', 'Lead form - Submit', 'Formularios') THEN metrics_conversions ELSE 0 END) AS conversions_form,
-    
-    -- Call: CMB, Llamadas..., C2C
-    SUM(CASE WHEN segments_conversion_action_name IN ('CMB', 'Llamadas desde anuncios (GAds)', 'Llamadas a teléfono en sitio web (desvío de llamada)', 'Clics en el número de teléfono en tu sitio web móvi (C2C)', 'C2C') THEN metrics_conversions ELSE 0 END) AS conversions_call,
-    
-    -- Total Conversions (All types)
-    SUM(metrics_conversions) AS conversions_total,
-    SUM(metrics_conversions_value) AS conversions_value_total
-  FROM
-    ${ref("ads_AdGroupConversionStats_1534842056")}
-  GROUP BY
-    1, 2, 3, 4
+    ac.segments_date AS date,
+    ac.customer_id,
+    ac.campaign_id,
+    ac.ad_group_id,
+    ac.ad_group_ad_ad_id AS ad_id,
+    -- CRM: Cualificado, Positivo, Formulario_04 (including _05, _06, _PAY variants)
+    SUM(CASE WHEN ac.segments_conversion_action_name LIKE '%Cualificado%'
+              OR ac.segments_conversion_action_name LIKE '%Positivo%'
+              OR ac.segments_conversion_action_name = 'Formulario_04'
+         THEN ac.metrics_conversions ELSE 0 END) AS conversions_crm,
+    -- Form
+    SUM(CASE WHEN ac.segments_conversion_action_name IN ('Form', 'Website lead', 'Envío de formulario para clientes potenciales', 'Lead form - Submit', 'Formularios')
+         THEN ac.metrics_conversions ELSE 0 END) AS conversions_form,
+    -- Call
+    SUM(CASE WHEN ac.segments_conversion_action_name IN ('CMB', 'Llamadas desde anuncios (GAds)', 'Llamadas a teléfono en sitio web (desvío de llamada)', 'Clics en el número de teléfono en tu sitio web móvi (C2C)', 'C2C')
+         THEN ac.metrics_conversions ELSE 0 END) AS conversions_call,
+    -- Visita
+    SUM(CASE WHEN ac.segments_conversion_action_name LIKE '%Visita%'
+         THEN ac.metrics_conversions ELSE 0 END) AS conversions_visita,
+    -- No Gestionado
+    SUM(CASE WHEN ac.segments_conversion_action_name LIKE '%No Gestionado%'
+              OR ac.segments_conversion_action_name LIKE '%NoGestionado%'
+         THEN ac.metrics_conversions ELSE 0 END) AS conversions_no_gestionado,
+    -- Total
+    SUM(ac.metrics_conversions) AS conversions_total,
+    SUM(ac.metrics_conversions_value) AS conversions_value_total
+  FROM ${ref("ads_AdConversionStats_1534842056")} ac
+  INNER JOIN campaign_info ci
+    ON ac.customer_id = ci.customer_id AND ac.campaign_id = ci.campaign_id
+  WHERE ci.campaign_advertising_channel_type != 'PERFORMANCE_MAX'
+     OR ci.campaign_advertising_channel_type IS NULL
+  GROUP BY 1, 2, 3, 4, 5
+
+  UNION ALL
+
+  -- PMax: ad_group-level conversions
+  SELECT
+    agc.segments_date AS date,
+    agc.customer_id,
+    agc.campaign_id,
+    agc.ad_group_id,
+    CAST(NULL AS INT64) AS ad_id,
+    SUM(CASE WHEN agc.segments_conversion_action_name LIKE '%Cualificado%'
+              OR agc.segments_conversion_action_name LIKE '%Positivo%'
+              OR agc.segments_conversion_action_name = 'Formulario_04'
+         THEN agc.metrics_conversions ELSE 0 END) AS conversions_crm,
+    SUM(CASE WHEN agc.segments_conversion_action_name IN ('Form', 'Website lead', 'Envío de formulario para clientes potenciales', 'Lead form - Submit', 'Formularios')
+         THEN agc.metrics_conversions ELSE 0 END) AS conversions_form,
+    SUM(CASE WHEN agc.segments_conversion_action_name IN ('CMB', 'Llamadas desde anuncios (GAds)', 'Llamadas a teléfono en sitio web (desvío de llamada)', 'Clics en el número de teléfono en tu sitio web móvi (C2C)', 'C2C')
+         THEN agc.metrics_conversions ELSE 0 END) AS conversions_call,
+    SUM(CASE WHEN agc.segments_conversion_action_name LIKE '%Visita%'
+         THEN agc.metrics_conversions ELSE 0 END) AS conversions_visita,
+    SUM(CASE WHEN agc.segments_conversion_action_name LIKE '%No Gestionado%'
+              OR agc.segments_conversion_action_name LIKE '%NoGestionado%'
+         THEN agc.metrics_conversions ELSE 0 END) AS conversions_no_gestionado,
+    SUM(agc.metrics_conversions) AS conversions_total,
+    SUM(agc.metrics_conversions_value) AS conversions_value_total
+  FROM ${ref("ads_AdGroupConversionStats_1534842056")} agc
+  INNER JOIN campaign_info ci
+    ON agc.customer_id = ci.customer_id AND agc.campaign_id = ci.campaign_id
+  WHERE ci.campaign_advertising_channel_type = 'PERFORMANCE_MAX'
+  GROUP BY 1, 2, 3, 4, 5
 ),
 
+-- ============================================================================
+-- Ad info: ad-level metadata for non-PMax campaigns
+-- ============================================================================
+ad_info AS (
+  SELECT
+    customer_id,
+    ad_group_id,
+    ad_group_ad_ad_id AS ad_id,
+    ad_group_ad_ad_type AS ad_type,
+    ad_group_ad_ad_strength AS ad_strength,
+    ad_group_ad_ad_final_urls AS ad_final_urls,
+    ad_group_ad_status AS ad_status
+  FROM (
+    SELECT
+      customer_id,
+      ad_group_id,
+      ad_group_ad_ad_id,
+      ad_group_ad_ad_type,
+      ad_group_ad_ad_strength,
+      ad_group_ad_ad_final_urls,
+      ad_group_ad_status,
+      ROW_NUMBER() OVER (
+        PARTITION BY customer_id, ad_group_ad_ad_id
+        ORDER BY _LATEST_DATE DESC, _DATA_DATE DESC
+      ) AS rn
+    FROM ${ref("ads_Ad_1534842056")}
+  )
+  WHERE rn = 1
+),
+
+-- ============================================================================
+-- Customer info with country mapping
+-- ============================================================================
 customer_info AS (
     SELECT
       customer_id,
@@ -78,27 +206,6 @@ customer_info AS (
       FROM ${ref("ads_Customer_1534842056")}
     )
     WHERE rn = 1
-),
-
-campaign_info AS (
-  SELECT
-    customer_id,
-    campaign_id,
-    campaign_name
-  FROM (
-    SELECT
-      customer_id,
-      campaign_id,
-      campaign_name,
-      _LATEST_DATE,
-      _DATA_DATE,
-      ROW_NUMBER() OVER (
-        PARTITION BY customer_id, campaign_id
-        ORDER BY _LATEST_DATE DESC, _DATA_DATE DESC
-      ) AS rn
-    FROM ${ref("ads_Campaign_1534842056")}
-  )
-  WHERE rn = 1
 ),
 
 ad_group_info AS (
@@ -131,21 +238,34 @@ SELECT
   cmp.campaign_name,
   s.ad_group_id,
   ag.ad_group_name,
-  
+  s.ad_id,
+  ai.ad_type,
+  ai.ad_strength,
+  ai.ad_final_urls,
+  ai.ad_status,
+  cmp.campaign_advertising_channel_type = 'PERFORMANCE_MAX' AS is_pmax,
+
   s.impressions,
   s.clicks,
   s.cost,
-  
+
   COALESCE(c.conversions_form, 0) AS conversions_form,
   COALESCE(c.conversions_call, 0) AS conversions_call,
   COALESCE(c.conversions_crm, 0) AS conversions_crm,
+  COALESCE(c.conversions_visita, 0) AS conversions_visita,
+  COALESCE(c.conversions_no_gestionado, 0) AS conversions_no_gestionado,
   COALESCE(c.conversions_total, 0) AS conversions_total,
   COALESCE(c.conversions_value_total, 0) AS conversions_value_total
 
 FROM
   basic_stats s
 LEFT JOIN
-  conversion_stats c USING(date, customer_id, campaign_id, ad_group_id)
+  conversion_stats c
+  ON s.date = c.date
+  AND s.customer_id = c.customer_id
+  AND s.campaign_id = c.campaign_id
+  AND s.ad_group_id = c.ad_group_id
+  AND COALESCE(CAST(s.ad_id AS STRING), '__NULL__') = COALESCE(CAST(c.ad_id AS STRING), '__NULL__')
 LEFT JOIN
   customer_info cust USING(customer_id)
 LEFT JOIN
@@ -156,3 +276,8 @@ LEFT JOIN
   ad_group_info ag
   ON s.customer_id = ag.customer_id
   AND s.ad_group_id = ag.ad_group_id
+LEFT JOIN
+  ad_info ai
+  ON s.customer_id = ai.customer_id
+  AND s.ad_group_id = ai.ad_group_id
+  AND s.ad_id = ai.ad_id

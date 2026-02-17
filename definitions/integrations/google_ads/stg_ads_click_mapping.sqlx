@@ -15,7 +15,10 @@ WITH unique_clicks AS (
     campaign_id,
     ad_group_id,
     customer_id,
-    segments_date as date
+    segments_date as date,
+    click_view_keyword AS keyword_text,
+    click_view_keyword_info_text AS keyword_match_text,
+    click_view_keyword_info_match_type AS keyword_match_type
   FROM
     ${ref("ads_ClickStats_1534842056")}
   WHERE
@@ -55,7 +58,10 @@ SELECT
   c.ad_group_id,
   ag.ad_group_name,
   c.customer_id,
-  acc.account_name
+  acc.account_name,
+  c.keyword_text,
+  c.keyword_match_text,
+  c.keyword_match_type
 FROM
   unique_clicks c
 LEFT JOIN

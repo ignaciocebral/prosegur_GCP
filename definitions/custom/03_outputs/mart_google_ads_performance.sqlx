@@ -1,7 +1,7 @@
 /*
 """
-Description: Standalone Google Ads performance mart. One row per customer_id + campaign_id + ad_group_id + date.
-             Does NOT depend on GA4 sessions. Includes ALL customer_ids from the MCC for cross-country visibility.
+Description: Standalone Google Ads performance mart at ad-level grain (ad_group for PMax).
+             Includes all conversion funnel stages and ad quality attributes.
 Author: Codex
 Date: 2026-02-16
 Purpose: Production
@@ -13,7 +13,7 @@ config {
   type: "table",
   schema: dataform.projectConfig.vars.OUTPUTS_DATASET,
   tags: [dataform.projectConfig.vars.LABEL_EXECUTION_OPERATION, "google_ads", "performance", "mart"],
-  description: "Google Ads performance mart at ad_group+date grain. All customer_ids from MCC, no session dependency.",
+  description: "Standalone Google Ads performance at ad-level grain (ad_group for PMax). Includes all conversion funnel stages and ad quality attributes. Use for Google Ads-specific analysis.",
   bigquery: {
     partitionBy: "date",
     clusterBy: ["customer_id", "campaign_id"]
@@ -29,12 +29,20 @@ SELECT
   campaign_name,
   ad_group_id,
   ad_group_name,
+  ad_id,
+  ad_type,
+  ad_strength,
+  ad_final_urls,
+  ad_status,
+  is_pmax,
   impressions,
   clicks,
   cost,
   conversions_form,
   conversions_call,
   conversions_crm,
+  conversions_visita,
+  conversions_no_gestionado,
   conversions_total,
   conversions_value_total
 FROM ${ref("stg_ads_performance")}

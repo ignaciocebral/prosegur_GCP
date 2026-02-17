@@ -1,0 +1,162 @@
+/*
+"""
+Description: Google Ads keyword Quality Score mart. One row per keyword+date.
+             Tracks QS components alongside performance metrics.
+Author: Codex
+Date: 2026-02-17
+Purpose: Production
+Retention: Permanent - Keyword quality analysis for search campaign optimization.
+"""
+*/
+
+config {
+  type: "table",
+  schema: dataform.projectConfig.vars.OUTPUTS_DATASET,
+  tags: [dataform.projectConfig.vars.LABEL_EXECUTION_OPERATION, "google_ads", "quality_score", "mart"],
+  description: "Google Ads keyword Quality Score mart. One row per keyword+date. Tracks QS components (ad relevance, landing page experience, expected CTR) alongside performance metrics.",
+  bigquery: {
+    partitionBy: "date",
+    clusterBy: ["customer_id", "campaign_id"]
+  }
+}
+
+WITH keyword_info AS (
+  SELECT
+    customer_id,
+    campaign_id,
+    ad_group_id,
+    ad_group_criterion_keyword_text AS keyword_text,
+    ad_group_criterion_keyword_match_type AS match_type,
+    ad_group_criterion_quality_info_quality_score AS quality_score,
+    ad_group_criterion_quality_info_creative_quality_score AS creative_quality_score,
+    ad_group_criterion_quality_info_post_click_quality_score AS post_click_quality_score,
+    ad_group_criterion_quality_info_search_predicted_ctr AS search_predicted_ctr,
+    ad_group_criterion_criterion_id AS criterion_id,
+    ad_group_criterion_status AS keyword_status
+  FROM (
+    SELECT
+      *,
+      ROW_NUMBER() OVER (
+        PARTITION BY customer_id, ad_group_criterion_criterion_id
+        ORDER BY _LATEST_DATE DESC, _DATA_DATE DESC
+      ) AS rn
+    FROM ${ref("ads_Keyword_1534842056")}
+  )
+  WHERE rn = 1
+),
+
+keyword_stats AS (
+  SELECT
+    segments_date AS date,
+    customer_id,
+    campaign_id,
+    ad_group_id,
+    ad_group_criterion_criterion_id AS criterion_id,
+    SUM(metrics_impressions) AS impressions,
+    SUM(metrics_clicks) AS clicks,
+    SUM(metrics_cost_micros) / 1000000 AS cost,
+    SUM(metrics_conversions) AS conversions
+  FROM ${ref("ads_KeywordStats_1534842056")}
+  GROUP BY 1, 2, 3, 4, 5
+),
+
+customer_info AS (
+  SELECT
+    customer_id,
+    customer_descriptive_name,
+    CASE
+      WHEN customer_id = 4263469660 THEN 'Argentina'
+      WHEN customer_id = 9192320856 THEN 'Brasil'
+      WHEN customer_id = 2412701548 THEN 'Colombia'
+      WHEN customer_id = 3987648656 THEN 'Peru'
+      WHEN customer_id = 1703013237 THEN 'Espana'
+      WHEN customer_id = 9812854435 THEN 'Paraguay'
+      WHEN customer_id = 2407906005 THEN 'Chile'
+      WHEN customer_id = 8037331123 THEN 'Portugal'
+      ELSE 'Other'
+    END AS country_code
+  FROM (
+    SELECT
+      customer_id,
+      customer_descriptive_name,
+      ROW_NUMBER() OVER (
+        PARTITION BY customer_id
+        ORDER BY _LATEST_DATE DESC, _DATA_DATE DESC
+      ) AS rn
+    FROM ${ref("ads_Customer_1534842056")}
+  )
+  WHERE rn = 1
+),
+
+campaign_info AS (
+  SELECT
+    customer_id,
+    campaign_id,
+    campaign_name
+  FROM (
+    SELECT
+      customer_id,
+      campaign_id,
+      campaign_name,
+      ROW_NUMBER() OVER (
+        PARTITION BY customer_id, campaign_id
+        ORDER BY _LATEST_DATE DESC, _DATA_DATE DESC
+      ) AS rn
+    FROM ${ref("ads_Campaign_1534842056")}
+  )
+  WHERE rn = 1
+),
+
+ad_group_info AS (
+  SELECT
+    customer_id,
+    ad_group_id,
+    ad_group_name
+  FROM (
+    SELECT
+      customer_id,
+      ad_group_id,
+      ad_group_name,
+      ROW_NUMBER() OVER (
+        PARTITION BY customer_id, ad_group_id
+        ORDER BY _LATEST_DATE DESC, _DATA_DATE DESC
+      ) AS rn
+    FROM ${ref("ads_AdGroup_1534842056")}
+  )
+  WHERE rn = 1
+)
+
+SELECT
+  ks.date,
+  cust.country_code,
+  cust.customer_descriptive_name AS customer_name,
+  ks.customer_id,
+  ks.campaign_id,
+  cmp.campaign_name,
+  ks.ad_group_id,
+  ag.ad_group_name,
+  ki.keyword_text,
+  ki.match_type,
+  ki.keyword_status,
+  ki.quality_score,
+  ki.creative_quality_score,
+  ki.post_click_quality_score,
+  ki.search_predicted_ctr,
+  ks.impressions,
+  ks.clicks,
+  ks.cost,
+  ks.conversions,
+  SAFE_DIVIDE(ks.clicks, NULLIF(ks.impressions, 0)) AS ctr
+FROM keyword_stats ks
+INNER JOIN keyword_info ki
+  ON ks.customer_id = ki.customer_id
+  AND ks.campaign_id = ki.campaign_id
+  AND ks.ad_group_id = ki.ad_group_id
+  AND ks.criterion_id = ki.criterion_id
+LEFT JOIN customer_info cust USING(customer_id)
+LEFT JOIN campaign_info cmp
+  ON ks.customer_id = cmp.customer_id
+  AND ks.campaign_id = cmp.campaign_id
+LEFT JOIN ad_group_info ag
+  ON ks.customer_id = ag.customer_id
+  AND ks.ad_group_id = ag.ad_group_id
