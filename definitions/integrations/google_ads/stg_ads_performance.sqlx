@@ -267,7 +267,8 @@ LEFT JOIN
   AND COALESCE(CAST(s.ad_group_id AS STRING), '__NULL__') = COALESCE(CAST(c.ad_group_id AS STRING), '__NULL__')
   AND COALESCE(CAST(s.ad_id AS STRING), '__NULL__') = COALESCE(CAST(c.ad_id AS STRING), '__NULL__')
 LEFT JOIN
-  customer_info cust USING(customer_id)
+  customer_info cust
+  ON s.customer_id = cust.customer_id
 LEFT JOIN
   campaign_info cmp
   ON s.customer_id = cmp.customer_id

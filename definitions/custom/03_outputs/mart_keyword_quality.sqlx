@@ -153,7 +153,8 @@ INNER JOIN keyword_info ki
   AND ks.campaign_id = ki.campaign_id
   AND ks.ad_group_id = ki.ad_group_id
   AND ks.criterion_id = ki.criterion_id
-LEFT JOIN customer_info cust USING(customer_id)
+LEFT JOIN customer_info cust
+  ON ks.customer_id = cust.customer_id
 LEFT JOIN campaign_info cmp
   ON ks.customer_id = cmp.customer_id
   AND ks.campaign_id = cmp.campaign_id
