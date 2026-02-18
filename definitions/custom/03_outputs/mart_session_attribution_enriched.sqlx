@@ -27,8 +27,37 @@ google_joined AS (
   SELECT * FROM ${ref("stg_google_ads_session_bridge")}
 ),
 
-meta_joined AS (
-  SELECT * FROM ${ref("stg_meta_ads_campaign_daily")}
+-- Campaign-level aggregation of Meta ad data.
+-- Used as the primary join key for all Meta sessions, guaranteeing one row per (date, campaign_name).
+-- Metrics are daily totals across all ads in the campaign.
+meta_campaign_agg AS (
+  SELECT
+    date,
+    campaign_id,
+    campaign_name,
+    account_id,
+    account_name,
+    ad_account_name,
+    SUM(impressions) AS impressions,
+    SUM(clicks) AS clicks,
+    SUM(link_clicks) AS link_clicks,
+    SUM(spend) AS spend,
+    SUM(conversions_cmb) AS conversions_cmb,
+    SUM(conversions_form) AS conversions_form,
+    SUM(conversions_cualificado) AS conversions_cualificado,
+    SUM(conversions_contact) AS conversions_contact,
+    SUM(conversions_total) AS conversions_total
+  FROM ${ref("stg_meta_ads_ad_daily")}
+  GROUP BY 1, 2, 3, 4, 5, 6
+),
+
+-- Ad-level lookup used only to enrich sessions where text-based UTMs are present.
+-- utm_term = adset_name, utm_content = ad_name (observed in ~10% of Meta sessions).
+-- The other ~90% of sessions use numeric tracking IDs in utm_term/utm_content which are
+-- from Meta's URL tracking system and do NOT match the Meta API adset_id/ad_id format.
+meta_ad_lookup AS (
+  SELECT date, campaign_name, adset_id, adset_name, ad_id, ad_name
+  FROM ${ref("stg_meta_ads_ad_daily")}
 ),
 
 joined AS (
@@ -48,32 +77,43 @@ joined AS (
     g.impressions AS google_impressions,
     g.clicks AS google_clicks,
     g.spend AS google_spend,
-    m.date AS meta_matched_date,
-    m.ad_account_name AS meta_ad_account_name,
-    m.campaign_id AS meta_campaign_id,
-    m.campaign_name AS meta_campaign_name,
-    m.adset_id AS meta_adset_id,
-    m.adset_name AS meta_adset_name,
-    m.impressions AS meta_impressions,
-    m.clicks AS meta_clicks,
-    m.link_clicks AS meta_link_clicks,
-    m.spend AS meta_spend,
-    m.conversions_cmb AS meta_conversions_cmb,
-    m.conversions_form AS meta_conversions_form,
-    m.conversions_cualificado AS meta_conversions_cualificado,
-    m.conversions_contact AS meta_conversions_contact,
-    m.conversions_total AS meta_conversions_total
+    -- Campaign-level Meta attribution (all Meta sessions)
+    mc.date AS meta_matched_date,
+    mc.account_id AS meta_account_id,
+    mc.account_name AS meta_account_name,
+    mc.ad_account_name AS meta_ad_account_name,
+    mc.campaign_id AS meta_campaign_id,
+    mc.campaign_name AS meta_campaign_name,
+    mc.impressions AS meta_impressions,
+    mc.clicks AS meta_clicks,
+    mc.link_clicks AS meta_link_clicks,
+    mc.spend AS meta_spend,
+    mc.conversions_cmb AS meta_conversions_cmb,
+    mc.conversions_form AS meta_conversions_form,
+    mc.conversions_cualificado AS meta_conversions_cualificado,
+    mc.conversions_contact AS meta_conversions_contact,
+    mc.conversions_total AS meta_conversions_total,
+    -- Ad-level enrichment (only for text-UTM sessions where adset_name/ad_name are in utm_term/utm_content)
+    mad.adset_id AS meta_adset_id,
+    mad.adset_name AS meta_adset_name,
+    mad.ad_id AS meta_ad_id,
+    mad.ad_name AS meta_ad_name
   FROM base b
   LEFT JOIN google_joined g
     ON b.session_gclid = g.gclid
     AND b.session_date = g.date
-  LEFT JOIN meta_joined m
-    ON b.session_date = m.date
+  -- Primary Meta join: campaign level, one row per session (deterministic)
+  LEFT JOIN meta_campaign_agg mc
+    ON b.session_date = mc.date
     AND LOWER(COALESCE(b.source, '')) IN ('meta', 'facebook', 'fb', 'ig', 'instagram', 'facebook.com', 'l.facebook.com', 'lm.facebook.com')
-    AND (
-      LOWER(TRIM(b.campaign)) = LOWER(TRIM(m.campaign_name))
-      OR CAST(b.campaign_id AS STRING) = CAST(m.campaign_id AS STRING)
-    )
+    AND LOWER(TRIM(b.campaign)) = LOWER(TRIM(mc.campaign_name))
+  -- Ad-level enrichment: only when utm_term/utm_content are text names, not numeric IDs
+  LEFT JOIN meta_ad_lookup mad
+    ON b.session_date = mad.date
+    AND mc.campaign_name = mad.campaign_name
+    AND NOT REGEXP_CONTAINS(COALESCE(b.term, ''), r'^[0-9]+$')
+    AND LOWER(TRIM(b.term)) = LOWER(TRIM(mad.adset_name))
+    AND LOWER(TRIM(b.content)) = LOWER(TRIM(mad.ad_name))
 )
 
 SELECT
@@ -125,11 +165,17 @@ SELECT
     STRUCT(
       meta_campaign_id IS NOT NULL AS is_matched,
       meta_matched_date AS matched_date,
+      meta_account_id AS account_id,
+      meta_account_name AS account_name,
       meta_ad_account_name AS ad_account_name,
       meta_campaign_id AS campaign_id,
       meta_campaign_name AS campaign_name,
+      -- adset_id/adset_name populated only for text-UTM sessions (~10%); NULL otherwise
       meta_adset_id AS adset_id,
       meta_adset_name AS adset_name,
+      -- ad_id/ad_name populated only for text-UTM sessions (~10%); NULL otherwise
+      meta_ad_id AS ad_id,
+      meta_ad_name AS ad_name,
       COALESCE(meta_impressions, 0) AS impressions,
       COALESCE(meta_clicks, 0) AS clicks,
       COALESCE(meta_link_clicks, 0) AS link_clicks,

@@ -1,0 +1,70 @@
+/*
+"""
+Description: Meta Ads ad-level daily performance. One row per (date, account, campaign, adset, ad).
+             Replaces stg_meta_ads_campaign_daily which was aggregated to campaign grain.
+             AdAccounts joined for real numeric account_id (AccountId) and business name.
+Author: Codex
+Date: 2026-02-18
+Purpose: Production
+Retention: Permanent - Required staging layer for ad-level paid attribution enrichment.
+"""
+*/
+
+config {
+  type: "table",
+  schema: dataform.projectConfig.vars.TRANSFORMATIONS_DATASET,
+  tags: [dataform.projectConfig.vars.LABEL_EXECUTION_OPERATION, "attribution", "meta_ads"],
+  description: "Meta Ads ad-level daily data. Grain: date+campaign_id+adset_id+ad_id. Includes conversions and proper account_id from AdAccounts table.",
+  bigquery: {
+    partitionBy: "date",
+    clusterBy: ["campaign_id", "adset_id", "ad_id"]
+  }
+}
+
+-- NOTE: AdAccounts (meta_ads_mcc_platform.AdAccounts) only contains MCC-level business account IDs,
+-- not individual ad account IDs. The account field in ad_insights is the ad account name (no numeric ID
+-- available in the raw data). account_id is set equal to account_name as a consequence.
+
+SELECT
+  date,
+  account AS ad_account_name,
+  account AS account_id,    -- no numeric account_id available in ad_insights source
+  account AS account_name,
+  CASE
+    WHEN LOWER(account) LIKE '%argentin%' THEN 'Argentina'
+    WHEN LOWER(account) LIKE '%brasil%' OR LOWER(account) LIKE '%brazil%' THEN 'Brasil'
+    WHEN LOWER(account) LIKE '%chile%' THEN 'Chile'
+    WHEN LOWER(account) LIKE '%colomb%' THEN 'Colombia'
+    WHEN LOWER(account) LIKE '%espan%' OR LOWER(account) LIKE '%spain%' THEN 'Espana'
+    WHEN LOWER(account) LIKE '%paragua%' THEN 'Paraguay'
+    WHEN LOWER(account) LIKE '%peru%' OR LOWER(account) LIKE '%perú%' THEN 'Peru'
+    WHEN LOWER(account) LIKE '%portug%' THEN 'Portugal'
+    WHEN LOWER(account) LIKE '%aleman%' OR LOWER(account) LIKE '%german%' THEN 'Alemania'
+    ELSE 'Other'
+  END AS country_code,
+  CAST(campaign_id AS STRING) AS campaign_id,
+  campaign_name,
+  CAST(adset_id AS STRING) AS adset_id,
+  adset_name,
+  CAST(ad_id AS STRING) AS ad_id,
+  ad_name,
+  COALESCE(impressions, 0) AS impressions,
+  COALESCE(clicks, 0) AS clicks,
+  COALESCE(spend, 0) AS spend,
+  COALESCE((SELECT a.count FROM UNNEST(actions) a WHERE a.name = 'link_click' LIMIT 1), 0) AS link_clicks,
+  COALESCE((SELECT SUM(c.count) FROM UNNEST(conversions) c WHERE LOWER(c.name) LIKE '%cmb%'), 0) AS conversions_cmb,
+  COALESCE((SELECT SUM(c.count) FROM UNNEST(conversions) c
+            WHERE c.name IN (
+              'offsite_conversion.fb_pixel_custom.Form',
+              'offsite_conversion.fb_pixel_custom.form',
+              'offsite_conversion.fb_pixel_custom.Formulario Contacto'
+            )), 0) AS conversions_form,
+  COALESCE((SELECT SUM(c.count) FROM UNNEST(conversions) c
+            WHERE c.name = 'offsite_conversion.fb_pixel_custom.Cualificado'), 0) AS conversions_cualificado,
+  COALESCE((SELECT SUM(c.count) FROM UNNEST(conversions) c
+            WHERE c.name = 'contact_total'), 0) AS conversions_contact,
+  COALESCE((SELECT SUM(c.count) FROM UNNEST(conversions) c), 0) AS conversions_total
+FROM ${ref("ad_insights")}
+WHERE campaign_id IS NOT NULL
+  AND date IS NOT NULL
+  AND ad_id IS NOT NULL

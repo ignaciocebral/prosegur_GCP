@@ -11,7 +11,7 @@ Retention: Permanent - Quality gate for spend data completeness.
 config {
   type: "assertion",
   tags: [dataform.projectConfig.vars.LABEL_EXECUTION_OPERATION, "quality", "spend"],
-  description: "Asserts that total spend in the campaign performance mart matches the sum of spend in stg_ads_performance (Google) and stg_meta_ads_campaign_daily (Meta) within a 1% tolerance."
+  description: "Asserts that total spend in the campaign performance mart matches the sum of spend in stg_ads_performance (Google) and stg_meta_ads_ad_daily (Meta) within a 1% tolerance."
 }
 
 WITH mart_spend AS (
@@ -33,7 +33,7 @@ source_meta AS (
   SELECT
     'meta_ads' AS platform,
     SUM(spend) AS total_spend
-  FROM ${ref("stg_meta_ads_campaign_daily")}
+  FROM ${ref("stg_meta_ads_ad_daily")}
 ),
 
 source_spend AS (
