@@ -1,17 +1,18 @@
-# === workflow_settings.yaml ===
-defaultProject: pga-data-b2b-marketing-dev
+# Public-safe workflow template.
+# Set real values in Dataform Release Configs (codeCompilationConfig) or CI/CD.
+defaultProject: your-gcp-project-id
 defaultLocation: europe-west1
-defaultDataset: analytics_297430230  # Solo un valor por defecto
+defaultDataset: analytics_example
 defaultAssertionDataset: superform_assertions
 
-
-vars: # Variables que variarás por país/entorno
-  GA4_DATASET:           analytics_297430230  # Paraguay por defecto
-  OUTPUTS_DATASET:       superform_outputs_297430230
-  TRANSFORMATIONS_DATASET: superform_transformations_297430230
-  QUALITY_DATASET:       superform_quality_297430230
-  LOCAL_TIMEZONE:        America/Asuncion
-  LABEL_GENERIC_BRAND:   prosegur_global
+vars:
+  GA4_PROJECT: your-gcp-project-id
+  GA4_DATASET: analytics_example
+  OUTPUTS_DATASET: superform_outputs_example
+  TRANSFORMATIONS_DATASET: superform_transformations_example
+  QUALITY_DATASET: superform_quality_example
+  LOCAL_TIMEZONE: Europe/Madrid
+  LABEL_GENERIC_BRAND: your_brand
   LABEL_EXECUTION_OPERATION: manual_workflow
-  GOOGLE_ADS_CUSTOMER_ID: "0" # Default value (No Ads) - Override per execution
-  META_ADS_SOURCE: meta_api_insights  # para poder cambiar entre meta_api_insights y meta_global_transfer
+  GOOGLE_ADS_CUSTOMER_ID: "0"
+  META_ADS_SOURCE: meta_api_insights

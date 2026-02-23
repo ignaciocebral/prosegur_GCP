@@ -20,6 +20,10 @@ config {
   }
 }
 
+js {
+  const { countryCodeFromCustomerNameSQL } = require("includes/custom/google_ads_helpers.js");
+}
+
 WITH keyword_info AS (
   SELECT
     customer_id,
@@ -64,17 +68,7 @@ customer_info AS (
   SELECT
     customer_id,
     customer_descriptive_name,
-    CASE
-      WHEN customer_id = 4263469660 THEN 'Argentina'
-      WHEN customer_id = 9192320856 THEN 'Brasil'
-      WHEN customer_id = 2412701548 THEN 'Colombia'
-      WHEN customer_id = 3987648656 THEN 'Peru'
-      WHEN customer_id = 1703013237 THEN 'Espana'
-      WHEN customer_id = 9812854435 THEN 'Paraguay'
-      WHEN customer_id = 2407906005 THEN 'Chile'
-      WHEN customer_id = 8037331123 THEN 'Portugal'
-      ELSE 'Other'
-    END AS country_code
+    ${countryCodeFromCustomerNameSQL("customer_descriptive_name")} AS country_code
   FROM (
     SELECT
       customer_id,
