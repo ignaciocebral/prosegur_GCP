@@ -4,7 +4,7 @@ function countryCodeFromCustomerNameSQL(columnName) {
       WHEN REGEXP_CONTAINS(LOWER(${columnName}), r'argentin') THEN 'Argentina'
       WHEN REGEXP_CONTAINS(LOWER(${columnName}), r'brasil|brazil') THEN 'Brasil'
       WHEN REGEXP_CONTAINS(LOWER(${columnName}), r'colombi') THEN 'Colombia'
-      WHEN REGEXP_CONTAINS(LOWER(${columnName}), r'peru|peru\\u0301') THEN 'Peru'
+      WHEN REGEXP_CONTAINS(LOWER(${columnName}), r'peru|perú') THEN 'Peru'
       WHEN REGEXP_CONTAINS(LOWER(${columnName}), r'espana|spain|corporativ') THEN 'Espana'
       WHEN REGEXP_CONTAINS(LOWER(${columnName}), r'paraguay') THEN 'Paraguay'
       WHEN REGEXP_CONTAINS(LOWER(${columnName}), r'chile') THEN 'Chile'
