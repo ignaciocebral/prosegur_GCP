@@ -80,7 +80,7 @@ with sessions_aggregation as (
 
         countif(e.event_name = 'generate_lead') as generate_lead,
         sum(e.ecommerce.purchase_revenue) as revenue,
-        ANY_VALUE(IF(e.event_name = 'page_view', e.page.title, NULL)) AS landing_page_title,
+        ARRAY_AGG(IF(e.event_name = 'page_view', e.page.title, NULL) IGNORE NULLS ORDER BY e.time.event_timestamp_utc ASC LIMIT 1)[SAFE_OFFSET(0)] AS landing_page_title,
 
 
     from ${ref("ga4_sessions")} s
