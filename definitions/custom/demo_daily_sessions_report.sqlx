@@ -37,8 +37,11 @@ with sessions_aggregation as (
         s.session_info.is_direct_session,
         s.device.category as device_category,
         s.geo.country,
+        s.geo.region,
         s.platform,
         s.stream_id,
+        s.user_pseudo_id,
+        s.time.session_duration_s,
 
         s.last_non_direct_traffic_source.campaign as session_campaign,
         s.last_non_direct_traffic_source.source as session_source,
@@ -77,6 +80,7 @@ with sessions_aggregation as (
 
         countif(e.event_name = 'generate_lead') as generate_lead,
         sum(e.ecommerce.purchase_revenue) as revenue,
+        ANY_VALUE(IF(e.event_name = 'page_view', e.page.title, NULL)) AS landing_page_title,
 
 
     from ${ref("ga4_sessions")} s
@@ -100,6 +104,7 @@ daily_aggregation as (
         is_direct_session,
         device_category,
         country,
+        region,
         platform,
         stream_id,
 
@@ -125,7 +130,8 @@ daily_aggregation as (
 
         count(distinct session_id) as sessions,
         count(distinct if(is_engaged_session, session_id, null)) as engaged_sessions,
-
+        count(distinct user_pseudo_id) as total_users,
+        sum(session_duration_s) as total_session_duration_s,
 
         sum(page_view) as page_view,
         sum(view_search_results) as view_search_results,
@@ -133,6 +139,7 @@ daily_aggregation as (
         sum(form) as form,
         sum(generate_lead) as generate_lead,
         sum(c2c) as c2c,
+        ANY_VALUE(landing_page_title) AS landing_page_title,
 
     from sessions_aggregation
     group by all
