@@ -131,6 +131,8 @@ daily_aggregation as (
         count(distinct session_id) as sessions,
         count(distinct if(is_engaged_session, session_id, null)) as engaged_sessions,
         count(distinct user_pseudo_id) as total_users,
+        count(distinct if(session_type = 'New Session', user_pseudo_id, null)) as new_users,
+        count(distinct if(is_engaged_session, user_pseudo_id, null)) as active_users,
         sum(session_duration_s) as total_session_duration_s,
 
         sum(page_view) as page_view,
