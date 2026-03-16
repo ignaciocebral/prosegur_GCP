@@ -23,7 +23,7 @@ pre_operations {
   declare date_checkpoint DATE;
   set date_checkpoint = (
     ${when(incremental(),
-      `SELECT COALESCE(MAX(session_date) - INTERVAL 3 DAY, DATE('2020-01-01')) FROM ${self()}`,
+      `SELECT COALESCE(DATE_SUB(MAX(session_date), INTERVAL 3 DAY), DATE('2020-01-01')) FROM ${self()}`,
       `SELECT DATE('2020-01-01')`
     )}
   );
