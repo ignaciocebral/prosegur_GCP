@@ -11,7 +11,7 @@ Retention: Permanent - Primary mart for performance marketing analysis (CPL, CPQ
 */
 
 config {
-  type: "table",
+  type: "incremental",
   schema: dataform.projectConfig.vars.OUTPUTS_DATASET,
   tags: [dataform.projectConfig.vars.LABEL_EXECUTION_OPERATION, "performance", "campaigns", "mart"],
   description: "PRIMARY cross-platform performance mart. FULL OUTER JOIN of Google Ads + Meta Ads + GA4. Campaign+ad_group/adset+date grain. Key metrics: CPL, CPQL, platform vs GA4 conversion comparison. Use for unified performance reporting.",
@@ -19,6 +19,19 @@ config {
     partitionBy: "date",
     clusterBy: ["platform", "country_code", "campaign_id"]
   }
+}
+
+pre_operations {
+  declare date_checkpoint DATE;
+  set date_checkpoint = (
+    ${when(incremental(),
+      `SELECT COALESCE(MAX(date) - INTERVAL 3 DAY, DATE('2020-01-01')) FROM ${self()}`,
+      `SELECT DATE('2020-01-01')`
+    )}
+  );
+  ${when(incremental(),
+    `DELETE FROM ${self()} WHERE date >= date_checkpoint`
+  )}
 }
 
 -- ============================================================================
@@ -50,6 +63,7 @@ WITH google_ads AS (
     conversions_total AS platform_conversions_total,
     conversions_value_total AS platform_conversions_value
   FROM ${ref("stg_ads_performance")}
+  WHERE date >= date_checkpoint
 ),
 
 meta_ads AS (
@@ -78,6 +92,7 @@ meta_ads AS (
     conversions_total AS platform_conversions_total,
     CAST(NULL AS FLOAT64) AS platform_conversions_value
   FROM ${ref("stg_meta_ads_ad_daily")}
+  WHERE date >= date_checkpoint
 ),
 
 unified_ads AS (
@@ -112,6 +127,7 @@ ga4_sessions_by_campaign AS (
   LEFT JOIN ${ref("stg_ga4_session_keys")} sk
     ON s.session_id = sk.session_id
   WHERE s.paid_attribution.attribution_source IN ('google_gclid', 'meta_campaign_id')
+    AND s.session_date >= date_checkpoint
   GROUP BY 1, 2, 3, 4
 ),
 
@@ -149,6 +165,7 @@ ga4_conversions_by_campaign AS (
   INNER JOIN ${ref("ga4_events")} e
     ON m.session_id = e.session_id
   WHERE m.paid_attribution.attribution_source IN ('google_gclid', 'meta_campaign_id')
+    AND m.session_date >= date_checkpoint
     AND (
       REGEXP_CONTAINS(LOWER(e.event_name), r'(page_view|cmb|form|c2c)')
       AND NOT REGEXP_CONTAINS(LOWER(e.event_name), r'formulario')

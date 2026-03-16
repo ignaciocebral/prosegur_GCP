@@ -11,7 +11,7 @@ Retention: Permanent - Required staging layer for ad-level paid attribution enri
 */
 
 config {
-  type: "table",
+  type: "incremental",
   schema: dataform.projectConfig.vars.TRANSFORMATIONS_DATASET,
   tags: [dataform.projectConfig.vars.LABEL_EXECUTION_OPERATION, "attribution", "meta_ads"],
   description: "Meta Ads ad-level daily data. Grain: date+campaign_id+adset_id+ad_id. Includes conversions and proper account_id from AdAccounts table.",
@@ -19,6 +19,19 @@ config {
     partitionBy: "date",
     clusterBy: ["campaign_id", "adset_id", "ad_id"]
   }
+}
+
+pre_operations {
+  declare date_checkpoint DATE;
+  set date_checkpoint = (
+    ${when(incremental(),
+      `SELECT COALESCE(MAX(date) - INTERVAL 3 DAY, DATE('2020-01-01')) FROM ${self()}`,
+      `SELECT DATE('2020-01-01')`
+    )}
+  );
+  ${when(incremental(),
+    `DELETE FROM ${self()} WHERE date >= date_checkpoint`
+  )}
 }
 
 -- NOTE: AdAccounts (meta_ads_mcc_platform.AdAccounts) only contains MCC-level business account IDs,
@@ -68,3 +81,4 @@ FROM ${ref("ad_insights")}
 WHERE campaign_id IS NOT NULL
   AND date IS NOT NULL
   AND ad_id IS NOT NULL
+  AND date >= date_checkpoint

@@ -1,5 +1,5 @@
 config {
-  type: "table",
+  type: "incremental",
   schema: dataform.projectConfig.vars.TRANSFORMATIONS_DATASET,
   tags: ["marketing", "google_ads"],
   description: "Daily performance metrics at ad-level grain (campaign-level for PMax). Includes all conversion funnel stages and ad quality attributes.",
@@ -7,6 +7,19 @@ config {
     partitionBy: "date",
     clusterBy: ["customer_id", "campaign_id"]
   }
+}
+
+pre_operations {
+  declare date_checkpoint DATE;
+  set date_checkpoint = (
+    ${when(incremental(),
+      `SELECT COALESCE(MAX(date) - INTERVAL 3 DAY, DATE('2020-01-01')) FROM ${self()}`,
+      `SELECT DATE('2020-01-01')`
+    )}
+  );
+  ${when(incremental(),
+    `DELETE FROM ${self()} WHERE date >= date_checkpoint`
+  )}
 }
 
 js {
@@ -35,6 +48,7 @@ WITH campaign_info AS (
         ORDER BY _LATEST_DATE DESC, _DATA_DATE DESC
       ) AS rn
     FROM ${ref("ads_Campaign_1534842056")}
+    WHERE customer_id = CAST(${dataform.projectConfig.vars.GOOGLE_ADS_CUSTOMER_ID} AS INT64)
   )
   WHERE rn = 1
 ),
@@ -56,8 +70,10 @@ basic_stats AS (
   FROM ${ref("ads_AdBasicStats_1534842056")} a
   INNER JOIN campaign_info ci
     ON a.customer_id = ci.customer_id AND a.campaign_id = ci.campaign_id
-  WHERE ci.campaign_advertising_channel_type != 'PERFORMANCE_MAX'
-     OR ci.campaign_advertising_channel_type IS NULL
+  WHERE a.customer_id = CAST(${dataform.projectConfig.vars.GOOGLE_ADS_CUSTOMER_ID} AS INT64)
+    AND a.segments_date >= date_checkpoint
+    AND (ci.campaign_advertising_channel_type != 'PERFORMANCE_MAX'
+     OR ci.campaign_advertising_channel_type IS NULL)
   GROUP BY 1, 2, 3, 4, 5
 
   UNION ALL
@@ -75,7 +91,9 @@ basic_stats AS (
   FROM ${ref("ads_CampaignBasicStats_1534842056")} cbs
   INNER JOIN campaign_info ci
     ON cbs.customer_id = ci.customer_id AND cbs.campaign_id = ci.campaign_id
-  WHERE ci.campaign_advertising_channel_type = 'PERFORMANCE_MAX'
+  WHERE cbs.customer_id = CAST(${dataform.projectConfig.vars.GOOGLE_ADS_CUSTOMER_ID} AS INT64)
+    AND cbs.segments_date >= date_checkpoint
+    AND ci.campaign_advertising_channel_type = 'PERFORMANCE_MAX'
   GROUP BY 1, 2, 3, 4, 5
 ),
 
@@ -114,8 +132,10 @@ conversion_stats AS (
   FROM ${ref("ads_AdConversionStats_1534842056")} ac
   INNER JOIN campaign_info ci
     ON ac.customer_id = ci.customer_id AND ac.campaign_id = ci.campaign_id
-  WHERE ci.campaign_advertising_channel_type != 'PERFORMANCE_MAX'
-     OR ci.campaign_advertising_channel_type IS NULL
+  WHERE ac.customer_id = CAST(${dataform.projectConfig.vars.GOOGLE_ADS_CUSTOMER_ID} AS INT64)
+    AND ac.segments_date >= date_checkpoint
+    AND (ci.campaign_advertising_channel_type != 'PERFORMANCE_MAX'
+     OR ci.campaign_advertising_channel_type IS NULL)
   GROUP BY 1, 2, 3, 4, 5
 
   UNION ALL
@@ -145,7 +165,9 @@ conversion_stats AS (
   FROM ${ref("ads_CampaignConversionStats_1534842056")} ccs
   INNER JOIN campaign_info ci
     ON ccs.customer_id = ci.customer_id AND ccs.campaign_id = ci.campaign_id
-  WHERE ci.campaign_advertising_channel_type = 'PERFORMANCE_MAX'
+  WHERE ccs.customer_id = CAST(${dataform.projectConfig.vars.GOOGLE_ADS_CUSTOMER_ID} AS INT64)
+    AND ccs.segments_date >= date_checkpoint
+    AND ci.campaign_advertising_channel_type = 'PERFORMANCE_MAX'
   GROUP BY 1, 2, 3, 4, 5
 ),
 
@@ -175,6 +197,7 @@ ad_info AS (
         ORDER BY _LATEST_DATE DESC, _DATA_DATE DESC
       ) AS rn
     FROM ${ref("ads_Ad_1534842056")}
+    WHERE customer_id = CAST(${dataform.projectConfig.vars.GOOGLE_ADS_CUSTOMER_ID} AS INT64)
   )
   WHERE rn = 1
 ),
@@ -198,6 +221,7 @@ customer_info AS (
           ORDER BY _LATEST_DATE DESC, _DATA_DATE DESC
         ) AS rn
       FROM ${ref("ads_Customer_1534842056")}
+      WHERE customer_id = CAST(${dataform.projectConfig.vars.GOOGLE_ADS_CUSTOMER_ID} AS INT64)
     )
     WHERE rn = 1
 ),
@@ -219,6 +243,7 @@ ad_group_info AS (
         ORDER BY _LATEST_DATE DESC, _DATA_DATE DESC
       ) AS rn
     FROM ${ref("ads_AdGroup_1534842056")}
+    WHERE customer_id = CAST(${dataform.projectConfig.vars.GOOGLE_ADS_CUSTOMER_ID} AS INT64)
   )
   WHERE rn = 1
 )

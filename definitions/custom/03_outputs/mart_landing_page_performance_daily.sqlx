@@ -10,7 +10,7 @@ Retention: Permanent - Output mart for landing page conversion analysis across a
 */
 
 config {
-  type: "table",
+  type: "incremental",
   schema: dataform.projectConfig.vars.OUTPUTS_DATASET,
   tags: [dataform.projectConfig.vars.LABEL_EXECUTION_OPERATION, "landing_pages", "performance", "mart"],
   description: "Landing page performance aggregated across ALL channels. Engagement rate, bounce rate, and conversion metrics by page path, channel, source/medium, device, and country.",
@@ -18,6 +18,19 @@ config {
     partitionBy: "session_date",
     clusterBy: ["landing_page_path", "default_channel_grouping"]
   }
+}
+
+pre_operations {
+  declare date_checkpoint DATE;
+  set date_checkpoint = (
+    ${when(incremental(),
+      `SELECT COALESCE(MAX(session_date) - INTERVAL 3 DAY, DATE('2020-01-01')) FROM ${self()}`,
+      `SELECT DATE('2020-01-01')`
+    )}
+  );
+  ${when(incremental(),
+    `DELETE FROM ${self()} WHERE session_date >= date_checkpoint`
+  )}
 }
 
 -- CTE 1: Session-level data with conversions
@@ -56,6 +69,7 @@ WITH session_with_conversions AS (
       AND NOT REGEXP_CONTAINS(LOWER(e.event_name), r'formulario')
       OR e.event_name = 'generate_lead'
     )
+  WHERE s.session_date >= date_checkpoint
   GROUP BY ALL
 ),
 

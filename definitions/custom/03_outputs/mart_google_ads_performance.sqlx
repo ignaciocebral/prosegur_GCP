@@ -10,7 +10,7 @@ Retention: Permanent - Primary output mart for Google Ads investment and platfor
 */
 
 config {
-  type: "table",
+  type: "incremental",
   schema: dataform.projectConfig.vars.OUTPUTS_DATASET,
   tags: [dataform.projectConfig.vars.LABEL_EXECUTION_OPERATION, "google_ads", "performance", "mart"],
   description: "Standalone Google Ads performance at ad-level grain (ad_group for PMax). Includes all conversion funnel stages and ad quality attributes. Use for Google Ads-specific analysis.",
@@ -18,6 +18,19 @@ config {
     partitionBy: "date",
     clusterBy: ["customer_id", "campaign_id"]
   }
+}
+
+pre_operations {
+  declare date_checkpoint DATE;
+  set date_checkpoint = (
+    ${when(incremental(),
+      `SELECT COALESCE(MAX(date) - INTERVAL 3 DAY, DATE('2020-01-01')) FROM ${self()}`,
+      `SELECT DATE('2020-01-01')`
+    )}
+  );
+  ${when(incremental(),
+    `DELETE FROM ${self()} WHERE date >= date_checkpoint`
+  )}
 }
 
 SELECT
@@ -46,3 +59,4 @@ SELECT
   conversions_total,
   conversions_value_total
 FROM ${ref("stg_ads_performance")}
+WHERE date >= date_checkpoint

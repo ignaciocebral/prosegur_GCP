@@ -9,7 +9,7 @@ Retention: Permanent - Core staging layer for session attribution enrichment.
 */
 
 config {
-  type: "table",
+  type: "incremental",
   schema: dataform.projectConfig.vars.TRANSFORMATIONS_DATASET,
   tags: [dataform.projectConfig.vars.LABEL_EXECUTION_OPERATION, "attribution", "sessions"],
   description: "Session-level key table used for deterministic attribution joins.",
@@ -17,6 +17,19 @@ config {
     partitionBy: "session_date",
     clusterBy: ["session_id", "session_gclid"]
   }
+}
+
+pre_operations {
+  declare date_checkpoint DATE;
+  set date_checkpoint = (
+    ${when(incremental(),
+      `SELECT COALESCE(MAX(session_date) - INTERVAL 3 DAY, DATE('2020-01-01')) FROM ${self()}`,
+      `SELECT DATE('2020-01-01')`
+    )}
+  );
+  ${when(incremental(),
+    `DELETE FROM ${self()} WHERE session_date >= date_checkpoint`
+  )}
 }
 
 SELECT
@@ -45,4 +58,5 @@ SELECT
   s.last_non_direct_traffic_source.campaign_id AS lnd_campaign_id,
   s.last_non_direct_traffic_source.default_channel_grouping AS lnd_default_channel_grouping
 FROM ${ref("ga4_sessions")} s
+WHERE s.session_date >= date_checkpoint
 QUALIFY ROW_NUMBER() OVER (PARTITION BY s.session_id ORDER BY s.session_date DESC) = 1

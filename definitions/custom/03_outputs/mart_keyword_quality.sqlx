@@ -10,7 +10,7 @@ Retention: Permanent - Keyword quality analysis for search campaign optimization
 */
 
 config {
-  type: "table",
+  type: "incremental",
   schema: dataform.projectConfig.vars.OUTPUTS_DATASET,
   tags: [dataform.projectConfig.vars.LABEL_EXECUTION_OPERATION, "google_ads", "quality_score", "mart"],
   description: "Google Ads keyword Quality Score mart. One row per keyword+date. Tracks QS components (ad relevance, landing page experience, expected CTR) alongside performance metrics.",
@@ -18,6 +18,19 @@ config {
     partitionBy: "date",
     clusterBy: ["customer_id", "campaign_id"]
   }
+}
+
+pre_operations {
+  declare date_checkpoint DATE;
+  set date_checkpoint = (
+    ${when(incremental(),
+      `SELECT COALESCE(MAX(date) - INTERVAL 3 DAY, DATE('2020-01-01')) FROM ${self()}`,
+      `SELECT DATE('2020-01-01')`
+    )}
+  );
+  ${when(incremental(),
+    `DELETE FROM ${self()} WHERE date >= date_checkpoint`
+  )}
 }
 
 js {
@@ -45,6 +58,7 @@ WITH keyword_info AS (
         ORDER BY _LATEST_DATE DESC, _DATA_DATE DESC
       ) AS rn
     FROM ${ref("ads_Keyword_1534842056")}
+    WHERE customer_id = CAST(${dataform.projectConfig.vars.GOOGLE_ADS_CUSTOMER_ID} AS INT64)
   )
   WHERE rn = 1
 ),
@@ -61,6 +75,8 @@ keyword_stats AS (
     SUM(metrics_cost_micros) / 1000000 AS cost,
     SUM(metrics_conversions) AS conversions
   FROM ${ref("ads_KeywordStats_1534842056")}
+  WHERE customer_id = CAST(${dataform.projectConfig.vars.GOOGLE_ADS_CUSTOMER_ID} AS INT64)
+    AND segments_date >= date_checkpoint
   GROUP BY 1, 2, 3, 4, 5
 ),
 
@@ -78,6 +94,7 @@ customer_info AS (
         ORDER BY _LATEST_DATE DESC, _DATA_DATE DESC
       ) AS rn
     FROM ${ref("ads_Customer_1534842056")}
+    WHERE customer_id = CAST(${dataform.projectConfig.vars.GOOGLE_ADS_CUSTOMER_ID} AS INT64)
   )
   WHERE rn = 1
 ),
@@ -97,6 +114,7 @@ campaign_info AS (
         ORDER BY _LATEST_DATE DESC, _DATA_DATE DESC
       ) AS rn
     FROM ${ref("ads_Campaign_1534842056")}
+    WHERE customer_id = CAST(${dataform.projectConfig.vars.GOOGLE_ADS_CUSTOMER_ID} AS INT64)
   )
   WHERE rn = 1
 ),
@@ -116,6 +134,7 @@ ad_group_info AS (
         ORDER BY _LATEST_DATE DESC, _DATA_DATE DESC
       ) AS rn
     FROM ${ref("ads_AdGroup_1534842056")}
+    WHERE customer_id = CAST(${dataform.projectConfig.vars.GOOGLE_ADS_CUSTOMER_ID} AS INT64)
   )
   WHERE rn = 1
 )

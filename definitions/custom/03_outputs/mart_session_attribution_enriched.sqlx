@@ -9,7 +9,7 @@ Retention: Permanent - Primary output mart for paid attribution analysis.
 */
 
 config {
-  type: "table",
+  type: "incremental",
   schema: dataform.projectConfig.vars.OUTPUTS_DATASET,
   tags: [dataform.projectConfig.vars.LABEL_EXECUTION_OPERATION, "attribution", "sessions", "mart"],
   description: "Session-grain attribution mart with deterministic paid-media enrichment (gclid for Google, campaign_id for Meta). Includes keyword data from ClickStats. Use for session-level deep dives and landing page analysis.",
@@ -19,8 +19,22 @@ config {
   }
 }
 
+pre_operations {
+  declare date_checkpoint DATE;
+  set date_checkpoint = (
+    ${when(incremental(),
+      `SELECT COALESCE(MAX(session_date) - INTERVAL 3 DAY, DATE('2020-01-01')) FROM ${self()}`,
+      `SELECT DATE('2020-01-01')`
+    )}
+  );
+  ${when(incremental(),
+    `DELETE FROM ${self()} WHERE session_date >= date_checkpoint`
+  )}
+}
+
 WITH base AS (
   SELECT * FROM ${ref("stg_ga4_session_keys")}
+  WHERE session_date >= date_checkpoint
 ),
 
 google_joined AS (

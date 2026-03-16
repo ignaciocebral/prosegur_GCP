@@ -10,7 +10,7 @@ Retention: Permanent - Primary output mart for Meta Ads investment and platform 
 */
 
 config {
-  type: "table",
+  type: "incremental",
   schema: dataform.projectConfig.vars.OUTPUTS_DATASET,
   tags: [dataform.projectConfig.vars.LABEL_EXECUTION_OPERATION, "meta_ads", "performance", "mart"],
   description: "Standalone Meta Ads performance at campaign+date grain with reach/frequency. Use for Meta-specific analysis.",
@@ -18,6 +18,19 @@ config {
     partitionBy: "date",
     clusterBy: ["campaign_id"]
   }
+}
+
+pre_operations {
+  declare date_checkpoint DATE;
+  set date_checkpoint = (
+    ${when(incremental(),
+      `SELECT COALESCE(MAX(date) - INTERVAL 3 DAY, DATE('2020-01-01')) FROM ${self()}`,
+      `SELECT DATE('2020-01-01')`
+    )}
+  );
+  ${when(incremental(),
+    `DELETE FROM ${self()} WHERE date >= date_checkpoint`
+  )}
 }
 
 WITH ad_level AS (
@@ -38,6 +51,7 @@ WITH ad_level AS (
   FROM ${ref("ad_insights")}
   WHERE campaign_id IS NOT NULL
     AND date IS NOT NULL
+    AND date >= date_checkpoint
 ),
 
 campaign_daily AS (
@@ -68,6 +82,7 @@ campaign_reach AS (
   FROM ${ref("campaign_insights")}
   WHERE campaign_id IS NOT NULL
     AND date IS NOT NULL
+    AND date >= date_checkpoint
 )
 
 SELECT

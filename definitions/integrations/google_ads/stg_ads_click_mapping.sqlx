@@ -1,5 +1,5 @@
 config {
-  type: "table",
+  type: "incremental",
   schema: dataform.projectConfig.vars.TRANSFORMATIONS_DATASET,
   tags: ["marketing", "google_ads"],
   description: "Mapping table to decode GCLIDs into Campaign, Ad Group, and Account names.",
@@ -7,6 +7,19 @@ config {
     partitionBy: "date",
     clusterBy: ["gclid"]
   }
+}
+
+pre_operations {
+  declare date_checkpoint DATE;
+  set date_checkpoint = (
+    ${when(incremental(),
+      `SELECT COALESCE(MAX(date) - INTERVAL 3 DAY, DATE('2020-01-01')) FROM ${self()}`,
+      `SELECT DATE('2020-01-01')`
+    )}
+  );
+  ${when(incremental(),
+    `DELETE FROM ${self()} WHERE date >= date_checkpoint`
+  )}
 }
 
 WITH unique_clicks AS (
@@ -24,30 +37,65 @@ WITH unique_clicks AS (
   WHERE
     click_view_gclid IS NOT NULL
     AND customer_id = CAST(${dataform.projectConfig.vars.GOOGLE_ADS_CUSTOMER_ID} AS INT64)
+    AND segments_date >= date_checkpoint
 ),
 
 campaigns AS (
-  SELECT DISTINCT
+  SELECT
+    customer_id,
     campaign_id,
     campaign_name
-  FROM
-    ${ref("ads_Campaign_1534842056")}
+  FROM (
+    SELECT
+      customer_id,
+      campaign_id,
+      campaign_name,
+      ROW_NUMBER() OVER (
+        PARTITION BY customer_id, campaign_id
+        ORDER BY _LATEST_DATE DESC, _DATA_DATE DESC
+      ) AS rn
+    FROM ${ref("ads_Campaign_1534842056")}
+    WHERE customer_id = CAST(${dataform.projectConfig.vars.GOOGLE_ADS_CUSTOMER_ID} AS INT64)
+  )
+  WHERE rn = 1
 ),
 
 ad_groups AS (
-  SELECT DISTINCT
+  SELECT
+    customer_id,
     ad_group_id,
     ad_group_name
-  FROM
-    ${ref("ads_AdGroup_1534842056")}
+  FROM (
+    SELECT
+      customer_id,
+      ad_group_id,
+      ad_group_name,
+      ROW_NUMBER() OVER (
+        PARTITION BY customer_id, ad_group_id
+        ORDER BY _LATEST_DATE DESC, _DATA_DATE DESC
+      ) AS rn
+    FROM ${ref("ads_AdGroup_1534842056")}
+    WHERE customer_id = CAST(${dataform.projectConfig.vars.GOOGLE_ADS_CUSTOMER_ID} AS INT64)
+  )
+  WHERE rn = 1
 ),
 
 accounts AS (
-  SELECT DISTINCT
+  SELECT
     customer_id,
     customer_descriptive_name AS account_name
-  FROM
-    ${ref("ads_Customer_1534842056")}
+  FROM (
+    SELECT
+      customer_id,
+      customer_descriptive_name,
+      ROW_NUMBER() OVER (
+        PARTITION BY customer_id
+        ORDER BY _LATEST_DATE DESC, _DATA_DATE DESC
+      ) AS rn
+    FROM ${ref("ads_Customer_1534842056")}
+    WHERE customer_id = CAST(${dataform.projectConfig.vars.GOOGLE_ADS_CUSTOMER_ID} AS INT64)
+  )
+  WHERE rn = 1
 )
 
 SELECT
@@ -65,8 +113,8 @@ SELECT
 FROM
   unique_clicks c
 LEFT JOIN
-  campaigns cmp USING(campaign_id)
+  campaigns cmp ON c.customer_id = cmp.customer_id AND c.campaign_id = cmp.campaign_id
 LEFT JOIN
-  ad_groups ag USING(ad_group_id)
+  ad_groups ag ON c.customer_id = ag.customer_id AND c.ad_group_id = ag.ad_group_id
 LEFT JOIN
-  accounts acc USING(customer_id)
+  accounts acc ON c.customer_id = acc.customer_id
