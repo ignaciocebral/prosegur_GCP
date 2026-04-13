@@ -5,16 +5,9 @@ config {
 }
 
 js {
-  const metaAccountNames = (dataform.projectConfig.vars.META_ADS_ACCOUNT_NAMES || "")
-    .split("|")
-    .map(name => name.trim())
-    .filter(Boolean);
-  const escapedMetaAccountNames = metaAccountNames.map(
-    name => `'${name.replace(/'/g, "\\'")}'`
-  );
-  const disallowedAccountsSql = metaAccountNames.length
-    ? `ad_account_name NOT IN (${escapedMetaAccountNames.join(", ")})`
-    : `TRUE`;
+  const { buildMetaDisallowedAccountsSql } = require("includes/custom/meta_ads_helpers.js");
+  const metaAccountNamesRaw = dataform.projectConfig.vars.META_ADS_ACCOUNT_NAMES || "";
+  const disallowedAccountsSql = buildMetaDisallowedAccountsSql(metaAccountNamesRaw, "ad_account_name");
 }
 
 SELECT

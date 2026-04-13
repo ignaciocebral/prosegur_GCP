@@ -22,23 +22,19 @@ config {
 }
 
 js {
-  const metaAccountNames = (dataform.projectConfig.vars.META_ADS_ACCOUNT_NAMES || "")
-    .split("|")
-    .map(name => name.trim())
-    .filter(Boolean);
-  const escapedMetaAccountNames = metaAccountNames.map(
-    name => `'${name.replace(/'/g, "\\'")}'`
-  );
-  const metaAccountFilterSql = metaAccountNames.length
-    ? `AND account IN (${escapedMetaAccountNames.join(", ")})`
-    : `AND FALSE -- no Meta account configured for this release config`;
+  const {
+    buildMetaAccountFilterSql,
+    buildMetaIncrementalDateCheckpointSql
+  } = require("includes/custom/meta_ads_helpers.js");
+  const metaAccountNamesRaw = dataform.projectConfig.vars.META_ADS_ACCOUNT_NAMES || "";
+  const metaAccountFilterSql = buildMetaAccountFilterSql(metaAccountNamesRaw, "account");
 }
 
 pre_operations {
   declare date_checkpoint DATE;
   set date_checkpoint = (
     ${when(incremental(),
-      `SELECT COALESCE(DATE_SUB(MAX(date), INTERVAL 3 DAY), DATE('2020-01-01')) FROM ${self()}`,
+      buildMetaIncrementalDateCheckpointSql(self(), metaAccountNamesRaw, "ad_account_name", "date"),
       `SELECT DATE('2020-01-01')`
     )}
   );
