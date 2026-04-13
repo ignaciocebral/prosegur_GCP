@@ -13,7 +13,7 @@ pre_operations {
   declare date_checkpoint DATE;
   set date_checkpoint = (
     ${when(incremental(),
-      `SELECT COALESCE(DATE_SUB(MAX(date), INTERVAL 3 DAY), DATE('2020-01-01')) FROM ${self()}`,
+      buildGoogleAdsIncrementalDateCheckpointSql(self(), googleAdsCustomerIdRaw, "customer_id", "date"),
       `SELECT DATE('2020-01-01')`
     )}
   );
@@ -23,7 +23,11 @@ pre_operations {
 }
 
 js {
-  const { countryCodeFromCustomerNameSQL } = require("includes/custom/google_ads_helpers.js");
+  const {
+    countryCodeFromCustomerNameSQL,
+    buildGoogleAdsIncrementalDateCheckpointSql
+  } = require("includes/custom/google_ads_helpers.js");
+  const googleAdsCustomerIdRaw = dataform.projectConfig.vars.GOOGLE_ADS_CUSTOMER_ID || "0";
 }
 
 -- ============================================================================

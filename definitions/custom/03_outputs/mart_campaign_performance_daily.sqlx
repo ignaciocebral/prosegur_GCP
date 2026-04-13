@@ -21,11 +21,22 @@ config {
   }
 }
 
+js {
+  const { buildUnifiedCampaignMartIncrementalDateCheckpointSql } = require("includes/custom/campaign_mart_helpers.js");
+  const googleAdsCustomerIdRaw = dataform.projectConfig.vars.GOOGLE_ADS_CUSTOMER_ID || "0";
+  const metaAccountNamesRaw = dataform.projectConfig.vars.META_ADS_ACCOUNT_NAMES || "";
+  const unifiedCampaignMartCheckpointSql = buildUnifiedCampaignMartIncrementalDateCheckpointSql(
+    self(),
+    googleAdsCustomerIdRaw,
+    metaAccountNamesRaw
+  );
+}
+
 pre_operations {
   declare date_checkpoint DATE;
   set date_checkpoint = (
     ${when(incremental(),
-      `SELECT COALESCE(DATE_SUB(MAX(date), INTERVAL 3 DAY), DATE('2020-01-01')) FROM ${self()}`,
+      unifiedCampaignMartCheckpointSql,
       `SELECT DATE('2020-01-01')`
     )}
   );
