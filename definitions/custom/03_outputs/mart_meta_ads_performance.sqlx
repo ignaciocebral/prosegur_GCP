@@ -20,6 +20,19 @@ config {
   }
 }
 
+js {
+  const metaAccountNames = (dataform.projectConfig.vars.META_ADS_ACCOUNT_NAMES || "")
+    .split("|")
+    .map(name => name.trim())
+    .filter(Boolean);
+  const escapedMetaAccountNames = metaAccountNames.map(
+    name => `'${name.replace(/'/g, "\\'")}'`
+  );
+  const metaAccountFilterSql = metaAccountNames.length
+    ? `AND account IN (${escapedMetaAccountNames.join(", ")})`
+    : `AND FALSE -- no Meta account configured for this release config`;
+}
+
 pre_operations {
   declare date_checkpoint DATE;
   set date_checkpoint = (
@@ -52,6 +65,7 @@ WITH ad_level AS (
   WHERE campaign_id IS NOT NULL
     AND date IS NOT NULL
     AND date >= date_checkpoint
+    ${metaAccountFilterSql}
 ),
 
 campaign_daily AS (

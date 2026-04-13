@@ -17,3 +17,4 @@ vars:
   GOOGLE_ADS_CUSTOMER_ID: "0"
   META_ADS_PROJECT: your-gcp-project-id
   META_ADS_SOURCE: meta_api_insights
+  META_ADS_ACCOUNT_NAMES: ""

@@ -1,0 +1,25 @@
+config {
+  type: "assertion",
+  tags: [dataform.projectConfig.vars.LABEL_EXECUTION_OPERATION, "quality", "meta_ads"],
+  description: "Asserts that Meta staging only contains the configured Meta account names for the release config."
+}
+
+js {
+  const metaAccountNames = (dataform.projectConfig.vars.META_ADS_ACCOUNT_NAMES || "")
+    .split("|")
+    .map(name => name.trim())
+    .filter(Boolean);
+  const escapedMetaAccountNames = metaAccountNames.map(
+    name => `'${name.replace(/'/g, "\\'")}'`
+  );
+  const disallowedAccountsSql = metaAccountNames.length
+    ? `ad_account_name NOT IN (${escapedMetaAccountNames.join(", ")})`
+    : `TRUE`;
+}
+
+SELECT
+  ad_account_name,
+  COUNT(*) AS rows_found
+FROM ${ref("stg_meta_ads_ad_daily")}
+WHERE ${disallowedAccountsSql}
+GROUP BY 1
