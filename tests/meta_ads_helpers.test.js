@@ -6,6 +6,10 @@ const {
   buildMetaDisallowedAccountsSql,
   buildMetaIncrementalDateCheckpointSql
 } = require("../includes/custom/meta_ads_helpers.js");
+const {
+  buildMetaAdsConversionBucketSql,
+  META_ADS_REVIEW_CONVERSION_NAMES
+} = require("../includes/custom/meta_ads_conversion_mapping.js");
 
 assert.deepStrictEqual(
   parseMetaAccountNames(" Prosegur Cash Guatemala | Prosegur Cash Paraguay_refresh "),
@@ -23,7 +27,7 @@ assert.strictEqual(
 );
 
 const checkpointSql = buildMetaIncrementalDateCheckpointSql(
-  "`project.dataset.stg_meta_ads_ad_daily`",
+  "`project.dataset.src_meta_ads_ad_daily`",
   "Prosegur Cash Guatemala",
   "ad_account_name",
   "date"
@@ -40,7 +44,7 @@ assert.ok(
 );
 
 const emptyConfigCheckpointSql = buildMetaIncrementalDateCheckpointSql(
-  "`project.dataset.stg_meta_ads_ad_daily`",
+  "`project.dataset.src_meta_ads_ad_daily`",
   "",
   "ad_account_name",
   "date"
@@ -49,6 +53,50 @@ const emptyConfigCheckpointSql = buildMetaIncrementalDateCheckpointSql(
 assert.ok(
   emptyConfigCheckpointSql.includes("WHERE TRUE"),
   "Checkpoint SQL should delete historical rows when the Meta account mapping is cleared."
+);
+
+const metaBuckets = buildMetaAdsConversionBucketSql("c.name");
+
+assert.ok(
+  metaBuckets.contact.includes("offsite_conversion.fb_pixel_custom.c2c"),
+  "Meta contact bucket should include c2c events."
+);
+
+assert.ok(
+  metaBuckets.contact.includes("offsite_conversion.fb_pixel_custom.click to call"),
+  "Meta contact bucket should include click to call events."
+);
+
+assert.ok(
+  metaBuckets.contact.includes("offsite_conversion.fb_pixel_custom.click_to_whatsapp"),
+  "Meta contact bucket should include click_to_whatsapp events."
+);
+
+assert.ok(
+  metaBuckets.noGestionado.includes("offsite_conversion.fb_pixel_custom.No Gestionado"),
+  "Meta no gestionado bucket should keep No Gestionado in the unmanaged bucket."
+);
+
+assert.ok(
+  metaBuckets.noCualificado.includes("offsite_conversion.fb_pixel_custom.No Cualificado") &&
+  metaBuckets.noCualificado.includes("offsite_conversion.fb_pixel_custom.Cuelga"),
+  "Meta no_cualificado bucket should include invalid and disqualified lead outcomes."
+);
+
+assert.ok(
+  metaBuckets.cualificadoNegativo.includes("offsite_conversion.fb_pixel_custom.Cualificado Negativo") &&
+  metaBuckets.cualificadoNegativo.includes("offsite_conversion.fb_pixel_custom.Baja Recaudacion"),
+  "Meta cualificado_negativo bucket should include negative qualified outcomes."
+);
+
+assert.ok(
+  metaBuckets.visita.includes("offsite_conversion.fb_pixel_custom.Visita"),
+  "Meta visita bucket should include Visita."
+);
+
+assert.ok(
+  META_ADS_REVIEW_CONVERSION_NAMES.includes("CompleteRegistration"),
+  "Meta review exclusions should keep unresolved live-only events out of the mapping assertion."
 );
 
 console.log("meta_ads_helpers regression tests passed");

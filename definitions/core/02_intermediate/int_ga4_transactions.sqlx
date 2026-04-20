@@ -15,6 +15,7 @@
    
 */
 
+-- This file transforms raw GA4 purchase/refund events into the intermediate transaction table with nested item detail.
 config {
   type: "incremental",
   tags: [dataform.projectConfig.vars.GA4_DATASET,"transactions","intermediate"],
@@ -27,12 +28,13 @@ config {
     columns: require("includes/core/documentation/helpers.js").ga4Transactions
 }
 
+-- This block imports package helpers and config values used by the GA4 transaction model.
 js {
     const { helpers } = require("includes/core/helpers");
     const config = helpers.getConfig();
 }
 
-/* incrementality */
+-- This block defines the incremental refresh window and rebuilds only the transaction dates that can still change.
 pre_operations {
   declare date_checkpoint DATE;
   set @@query_label = "${helpers.executionLabels()}";
@@ -52,12 +54,14 @@ pre_operations {
   }
 }
 
+-- This CTE filters raw GA4 events down to purchase and refund events only.
 with src as (
     select * from ${ref("ga4_events")}
     where event_date >= date_checkpoint
     and event_name in ('purchase', 'refund') -- events is clustered by event_name, so it's pretty cheap
 ),
 
+-- This CTE shapes the transaction-level fields, nested ecommerce fields, and item totals used downstream.
 step1 as (
     -- we get the basic columns + ecommerce data, nested items + the item totals
     select
@@ -102,9 +106,9 @@ step1 as (
 )
 
 
+-- This final select publishes the modeled transaction rows without adding extra logic on top.
 select
     *
 from step1
-
 
 

@@ -13,6 +13,6 @@ js {
 SELECT
   ad_account_name,
   COUNT(*) AS rows_found
-FROM ${ref("stg_meta_ads_ad_daily")}
+FROM ${ref("src_meta_ads_ad_daily")}
 WHERE ${disallowedAccountsSql}
 GROUP BY 1

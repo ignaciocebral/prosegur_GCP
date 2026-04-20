@@ -8,6 +8,7 @@ Retention: Permanent - Core staging layer for session attribution enrichment.
 """
 */
 
+-- This file extracts the session fields that are later used to match GA4 sessions with paid-media data.
 config {
   type: "incremental",
   schema: dataform.projectConfig.vars.TRANSFORMATIONS_DATASET,
@@ -19,6 +20,7 @@ config {
   }
 }
 
+-- This block defines the incremental refresh window so only recent session keys are rebuilt each run.
 pre_operations {
   declare date_checkpoint DATE;
   set date_checkpoint = (
@@ -32,6 +34,7 @@ pre_operations {
   )}
 }
 
+-- This final select keeps one row per session with the attribution keys needed by the paid-media intermediate models.
 SELECT
   s.session_id,
   s.session_date,

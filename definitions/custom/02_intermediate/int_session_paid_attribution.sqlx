@@ -1,0 +1,221 @@
+/*
+"""
+Description: Produces a session-grain staging table enriched with deterministic Google Ads and Meta Ads context.
+Author: Codex
+Date: 2026-04-17
+Purpose: Production
+Retention: Permanent - Paid-media attribution staging layer.
+"""
+*/
+
+-- This file enriches each session with the best available Google Ads or Meta Ads match and builds the paid_attribution struct.
+config {
+  type: "incremental",
+  schema: dataform.projectConfig.vars.TRANSFORMATIONS_DATASET,
+  tags: [dataform.projectConfig.vars.LABEL_EXECUTION_OPERATION, "attribution", "sessions", "staging"],
+  description: "Session-grain staging table with deterministic paid-media enrichment and the final paid_attribution struct.",
+  bigquery: {
+    partitionBy: "session_date",
+    clusterBy: ["session_id", "source", "medium"]
+  }
+}
+
+-- This block defines the incremental refresh window so only recent sessions are rebuilt each run.
+pre_operations {
+  declare date_checkpoint DATE;
+  set date_checkpoint = (
+    ${when(incremental(),
+      `SELECT COALESCE(DATE_SUB(MAX(session_date), INTERVAL 3 DAY), DATE('2020-01-01')) FROM ${self()}`,
+      `SELECT DATE('2020-01-01')`
+    )}
+  );
+  ${when(incremental(),
+    `DELETE FROM ${self()} WHERE session_date >= date_checkpoint`
+  )}
+}
+
+-- This CTE reads the session-level source rows that will receive paid-media enrichment.
+WITH base AS (
+  SELECT *
+  FROM ${ref("stg_ga4_session_keys")}
+  WHERE session_date >= date_checkpoint
+),
+
+-- This CTE exposes the deterministic Google Ads bridge as the join target for gclid-based attribution.
+google_joined AS (
+  SELECT *
+  FROM ${ref("int_google_ads_session_bridge")}
+),
+
+-- This CTE aggregates Meta to campaign grain so sessions can still be matched when only campaign-level UTM data is available.
+meta_campaign_agg AS (
+  SELECT
+    date,
+    campaign_id,
+    campaign_name,
+    account_id,
+    account_name,
+    ad_account_name,
+    SUM(impressions) AS impressions,
+    SUM(clicks) AS clicks,
+    SUM(link_clicks) AS link_clicks,
+    SUM(spend) AS spend,
+    SUM(conversions_cmb) AS conversions_cmb,
+    SUM(conversions_form) AS conversions_form,
+    SUM(conversions_cualificado) AS conversions_cualificado,
+    SUM(conversions_contact) AS conversions_contact,
+    SUM(conversions_no_gestionado) AS conversions_no_gestionado,
+    SUM(conversions_no_cualificado) AS conversions_no_cualificado,
+    SUM(conversions_cualificado_negativo) AS conversions_cualificado_negativo,
+    SUM(conversions_total) AS conversions_total
+  FROM ${ref("src_meta_ads_ad_daily")}
+  GROUP BY 1, 2, 3, 4, 5, 6
+),
+
+-- This CTE keeps Meta ad and adset metadata so campaign matches can be enriched with lower-grain detail when possible.
+meta_ad_lookup AS (
+  SELECT
+    date,
+    campaign_name,
+    adset_id,
+    adset_name,
+    ad_id,
+    ad_name
+  FROM ${ref("src_meta_ads_ad_daily")}
+),
+
+-- This CTE performs the actual Google and Meta joins and keeps every enrichment field needed for the final struct.
+joined AS (
+  SELECT
+    b.*,
+    g.gclid AS google_matched_gclid,
+    g.date AS google_matched_date,
+    g.customer_id AS google_customer_id,
+    g.account_name AS google_account_name,
+    g.campaign_id AS google_campaign_id,
+    g.campaign_name AS google_campaign_name,
+    g.ad_group_id AS google_ad_group_id,
+    g.ad_group_name AS google_ad_group_name,
+    g.keyword_text AS google_keyword_text,
+    g.keyword_match_text AS google_keyword_match_text,
+    g.keyword_match_type AS google_keyword_match_type,
+    g.impressions AS google_impressions,
+    g.clicks AS google_clicks,
+    g.spend AS google_spend,
+    mc.date AS meta_matched_date,
+    mc.account_id AS meta_account_id,
+    mc.account_name AS meta_account_name,
+    mc.ad_account_name AS meta_ad_account_name,
+    mc.campaign_id AS meta_campaign_id,
+    mc.campaign_name AS meta_campaign_name,
+    mc.impressions AS meta_impressions,
+    mc.clicks AS meta_clicks,
+    mc.link_clicks AS meta_link_clicks,
+    mc.spend AS meta_spend,
+    mc.conversions_cmb AS meta_conversions_cmb,
+    mc.conversions_form AS meta_conversions_form,
+    mc.conversions_cualificado AS meta_conversions_cualificado,
+    mc.conversions_contact AS meta_conversions_contact,
+    mc.conversions_no_gestionado AS meta_conversions_no_gestionado,
+    mc.conversions_no_cualificado AS meta_conversions_no_cualificado,
+    mc.conversions_cualificado_negativo AS meta_conversions_cualificado_negativo,
+    mc.conversions_total AS meta_conversions_total,
+    mad.adset_id AS meta_adset_id,
+    mad.adset_name AS meta_adset_name,
+    mad.ad_id AS meta_ad_id,
+    mad.ad_name AS meta_ad_name
+  FROM base b
+  LEFT JOIN google_joined g
+    ON b.session_gclid = g.gclid
+    AND b.session_date = g.date
+  LEFT JOIN meta_campaign_agg mc
+    ON b.session_date = mc.date
+    AND LOWER(COALESCE(b.source, '')) IN ('meta', 'facebook', 'fb', 'ig', 'instagram', 'facebook.com', 'l.facebook.com', 'lm.facebook.com')
+    AND LOWER(TRIM(b.campaign)) = LOWER(TRIM(mc.campaign_name))
+  LEFT JOIN meta_ad_lookup mad
+    ON b.session_date = mad.date
+    AND mc.campaign_name = mad.campaign_name
+    AND NOT REGEXP_CONTAINS(COALESCE(b.term, ''), r'^[0-9]+$')
+    AND LOWER(TRIM(b.term)) = LOWER(TRIM(mad.adset_name))
+    AND LOWER(TRIM(b.content)) = LOWER(TRIM(mad.ad_name))
+)
+
+-- This final select builds the paid_attribution struct and keeps one best row per session.
+SELECT
+  session_id,
+  session_date,
+  user_pseudo_id,
+  property_id,
+  source,
+  medium,
+  campaign,
+  campaign_id,
+  term,
+  content,
+  default_channel_grouping,
+  session_gclid,
+  session_dclid,
+  session_srsltid,
+  session_gbraid,
+  session_wbraid,
+  session_msclkid,
+  lnd_source,
+  lnd_medium,
+  lnd_campaign,
+  lnd_campaign_id,
+  lnd_default_channel_grouping,
+  STRUCT(
+    CASE
+      WHEN google_matched_gclid IS NOT NULL THEN 'google_gclid'
+      WHEN meta_campaign_id IS NOT NULL THEN 'meta_campaign_id'
+      ELSE 'unmatched'
+    END AS attribution_source,
+    STRUCT(
+      google_matched_gclid IS NOT NULL AS is_matched,
+      google_matched_date AS matched_date,
+      google_customer_id AS customer_id,
+      google_account_name AS account_name,
+      google_campaign_id AS campaign_id,
+      google_campaign_name AS campaign_name,
+      google_ad_group_id AS ad_group_id,
+      google_ad_group_name AS ad_group_name,
+      google_keyword_text AS keyword_text,
+      google_keyword_match_text AS keyword_match_text,
+      google_keyword_match_type AS keyword_match_type,
+      COALESCE(google_impressions, 0) AS impressions,
+      COALESCE(google_clicks, 0) AS clicks,
+      COALESCE(google_spend, 0) AS spend
+    ) AS google_ads,
+    STRUCT(
+      meta_campaign_id IS NOT NULL AS is_matched,
+      meta_matched_date AS matched_date,
+      meta_account_id AS account_id,
+      meta_account_name AS account_name,
+      meta_ad_account_name AS ad_account_name,
+      meta_campaign_id AS campaign_id,
+      meta_campaign_name AS campaign_name,
+      meta_adset_id AS adset_id,
+      meta_adset_name AS adset_name,
+      meta_ad_id AS ad_id,
+      meta_ad_name AS ad_name,
+      COALESCE(meta_impressions, 0) AS impressions,
+      COALESCE(meta_clicks, 0) AS clicks,
+      COALESCE(meta_link_clicks, 0) AS link_clicks,
+      COALESCE(meta_spend, 0) AS spend,
+      COALESCE(meta_conversions_cmb, 0) AS conversions_cmb,
+      COALESCE(meta_conversions_form, 0) AS conversions_form,
+      COALESCE(meta_conversions_cualificado, 0) AS conversions_cualificado,
+      COALESCE(meta_conversions_contact, 0) AS conversions_contact,
+      COALESCE(meta_conversions_no_gestionado, 0) AS conversions_no_gestionado,
+      COALESCE(meta_conversions_no_cualificado, 0) AS conversions_no_cualificado,
+      COALESCE(meta_conversions_cualificado_negativo, 0) AS conversions_cualificado_negativo,
+      COALESCE(meta_conversions_total, 0) AS conversions_total
+    ) AS meta_ads
+  ) AS paid_attribution
+FROM joined
+QUALIFY ROW_NUMBER() OVER (
+  PARTITION BY session_id
+  ORDER BY
+    IF(google_matched_gclid IS NOT NULL, 1, 0) DESC,
+    IF(meta_campaign_id IS NOT NULL, 1, 0) DESC
+) = 1

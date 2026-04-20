@@ -5,6 +5,11 @@ const {
   buildGoogleAdsIncrementalDateCheckpointSql
 } = require("../includes/custom/google_ads_helpers.js");
 const {
+  buildGoogleAdsConversionBucketSql,
+  buildGoogleAdsIgnoredActionSql,
+  GOOGLE_ADS_IGNORED_ACTION_NAMES
+} = require("../includes/custom/google_ads_conversion_mapping.js");
+const {
   buildUnifiedCampaignMartIncrementalDateCheckpointSql
 } = require("../includes/custom/campaign_mart_helpers.js");
 
@@ -74,6 +79,53 @@ assert.ok(
 assert.ok(
   unifiedMartCheckpointSql.includes("platform = 'meta_ads' AND (account_name NOT IN ('Prosegur Cash Guatemala'))"),
   "The unified campaign mart checkpoint should scope Meta stale detection to Meta rows only."
+);
+
+const bucketSql = buildGoogleAdsConversionBucketSql("action_name");
+const ignoredActionSql = buildGoogleAdsIgnoredActionSql("action_name");
+
+assert.ok(
+  bucketSql.crm.includes("^(Cualificado|Positivo)(_|$)"),
+  "CRM mapping should anchor the Cualificado/Positivo family and avoid false positives like 'No Cualificado'."
+);
+
+assert.ok(
+  bucketSql.crm.includes("^Formulario_04($|_)"),
+  "CRM mapping should cover Formulario_04 variants such as _PAY."
+);
+
+assert.ok(
+  bucketSql.form.includes("Lead Submit") &&
+  bucketSql.form.includes("Prosegur Paraguay - GA4 (web) generate_lead"),
+  "Form mapping should include the audited Lead Submit and Paraguay GA4 generate_lead actions."
+);
+
+assert.ok(
+  bucketSql.call.includes("Prosegur Paraguay - GA4 (web) c2c") &&
+  bucketSql.call.includes("CMB"),
+  "Call mapping should include both callback-style CMB actions and the Paraguay GA4 c2c action."
+);
+
+assert.ok(
+  bucketSql.noGestionado.includes("No Cualificado") &&
+  bucketSql.noGestionado.includes("NoUtil_formulario_02"),
+  "Negative lead states should be mapped to no_gestionado."
+);
+
+assert.ok(
+  GOOGLE_ADS_IGNORED_ACTION_NAMES.includes("Conversation started"),
+  "Ignored Google Ads actions should keep Conversation started outside the hard buckets."
+);
+
+assert.ok(
+  GOOGLE_ADS_IGNORED_ACTION_NAMES.includes("Purchase"),
+  "Ignored Google Ads actions should keep ecommerce actions out of the lead mapping assertion."
+);
+
+assert.ok(
+  ignoredActionSql.includes("Conversation started") &&
+  ignoredActionSql.includes("Purchase"),
+  "Ignored Google Ads actions should be reusable in SQL to exclude them from downstream conversion totals."
 );
 
 console.log("google ads incremental + grain regression tests passed");

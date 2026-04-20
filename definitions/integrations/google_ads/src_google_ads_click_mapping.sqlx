@@ -1,8 +1,13 @@
+// Deduplica:  sirve para traducir un gclid de Google Ads a la metadata de Ads que luego necesitas para atribución.
+// tabla puente: gclid -> metadata de click para luego unirlo con sesiones
+
+
+
 config {
   type: "incremental",
   schema: dataform.projectConfig.vars.TRANSFORMATIONS_DATASET,
   tags: ["marketing", "google_ads"],
-  description: "Mapping table to decode GCLIDs into Campaign, Ad Group, and Account names.",
+  description: "Google Ads source-normalized mapping table to decode GCLIDs into campaign, ad group, and account names.",
   bigquery: {
     partitionBy: "date",
     clusterBy: ["gclid"]
@@ -40,26 +45,6 @@ WITH unique_clicks AS (
     AND segments_date >= date_checkpoint
 ),
 
-campaigns AS (
-  SELECT
-    customer_id,
-    campaign_id,
-    campaign_name
-  FROM (
-    SELECT
-      customer_id,
-      campaign_id,
-      campaign_name,
-      ROW_NUMBER() OVER (
-        PARTITION BY customer_id, campaign_id
-        ORDER BY _LATEST_DATE DESC, _DATA_DATE DESC
-      ) AS rn
-    FROM ${ref("ads_Campaign_1534842056")}
-    WHERE customer_id = CAST(${dataform.projectConfig.vars.GOOGLE_ADS_CUSTOMER_ID} AS INT64)
-  )
-  WHERE rn = 1
-),
-
 ad_groups AS (
   SELECT
     customer_id,
@@ -75,24 +60,6 @@ ad_groups AS (
         ORDER BY _LATEST_DATE DESC, _DATA_DATE DESC
       ) AS rn
     FROM ${ref("ads_AdGroup_1534842056")}
-    WHERE customer_id = CAST(${dataform.projectConfig.vars.GOOGLE_ADS_CUSTOMER_ID} AS INT64)
-  )
-  WHERE rn = 1
-),
-
-accounts AS (
-  SELECT
-    customer_id,
-    customer_descriptive_name AS account_name
-  FROM (
-    SELECT
-      customer_id,
-      customer_descriptive_name,
-      ROW_NUMBER() OVER (
-        PARTITION BY customer_id
-        ORDER BY _LATEST_DATE DESC, _DATA_DATE DESC
-      ) AS rn
-    FROM ${ref("ads_Customer_1534842056")}
     WHERE customer_id = CAST(${dataform.projectConfig.vars.GOOGLE_ADS_CUSTOMER_ID} AS INT64)
   )
   WHERE rn = 1
@@ -113,8 +80,8 @@ SELECT
 FROM
   unique_clicks c
 LEFT JOIN
-  campaigns cmp ON c.customer_id = cmp.customer_id AND c.campaign_id = cmp.campaign_id
+  ${ref("src_google_ads_campaign_lookup")} cmp ON c.customer_id = cmp.customer_id AND c.campaign_id = cmp.campaign_id
 LEFT JOIN
   ad_groups ag ON c.customer_id = ag.customer_id AND c.ad_group_id = ag.ad_group_id
 LEFT JOIN
-  accounts acc ON c.customer_id = acc.customer_id
+  ${ref("src_google_ads_customer_lookup")} acc ON c.customer_id = acc.customer_id

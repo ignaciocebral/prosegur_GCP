@@ -15,6 +15,7 @@
    
 */
 
+-- This file transforms raw GA4 events into one modeled row per valid session with session-level traffic-source metadata.
 config {
   type: "incremental",
   description: "Intermediate incremental sessions table with modeling helpers implemented. 1 row per unique session_id. Contains only valid sessions.",
@@ -28,12 +29,13 @@ config {
   },
 }
 
+-- This block imports package helpers and config values used by the GA4 session model.
 js {
     const { helpers } = require("includes/core/helpers");
     const config = helpers.getConfig();
 }
 
-/* incrementality */
+-- This block defines the incremental refresh window and rebuilds only the session dates that can still change.
 pre_operations {
   declare date_checkpoint DATE;
   set @@query_label = "${helpers.executionLabels()}";
@@ -53,7 +55,7 @@ pre_operations {
   }
 }
 
--- simple sessions: referrers as is, no Last Non Direct - 1 source per session (the first no null)
+-- This CTE aggregates raw GA4 events into one preliminary row per session before traffic-source modeling is added.
 
 with events as (
   select
@@ -124,6 +126,7 @@ with events as (
     -- this should not lead to duplicates. If it does, we'll get rid of those in ga4_sessions anyway
 ),
 
+-- This CTE provides the source-category lookup used to derive channel grouping later in the model.
 source_categories as (
     select
      source,
@@ -131,8 +134,7 @@ source_categories as (
     from ${ref("source_categories")}
 ),
 
-
--- create time struct + session_source struct with first and last traffic_source of the session
+-- This CTE packages time fields and builds the modeled session_source struct with first and last attribution views.
 add_meta_info as (
   select
     * except (
@@ -190,6 +192,7 @@ add_meta_info as (
     on join_last.source = events.last_traffic_source.source
 )
 
+-- This final select keeps only the session rows that are new or still incomplete and drops helper fields not needed downstream.
 select
   * except(is_multiday_session)
 from add_meta_info
@@ -198,7 +201,6 @@ where (
   or is_multiday_session -- or older sessions from yesterday
 )
 -- could be some incremental duplicates, these will be discarded downstream
-
 
 
 

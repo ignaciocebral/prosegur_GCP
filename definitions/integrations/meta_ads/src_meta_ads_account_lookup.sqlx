@@ -1,0 +1,32 @@
+// Sirve para convertir cada cuenta de Meta Ads en una única fila limpia con el nombre de cuenta y su país derivado.
+
+config {
+  type: "table",
+  schema: dataform.projectConfig.vars.TRANSFORMATIONS_DATASET,
+  tags: ["marketing", "meta_ads", "lookup"],
+  description: "Meta Ads account lookup with account name and derived country code."
+}
+
+SELECT
+  account AS account_name,
+  account AS account_id,
+  CASE
+    WHEN LOWER(account) LIKE '%argentin%' THEN 'Argentina'
+    WHEN LOWER(account) LIKE '%brasil%' OR LOWER(account) LIKE '%brazil%' THEN 'Brasil'
+    WHEN LOWER(account) LIKE '%chile%' THEN 'Chile'
+    WHEN LOWER(account) LIKE '%colomb%' THEN 'Colombia'
+    WHEN LOWER(account) LIKE '%espan%' OR LOWER(account) LIKE '%spain%' THEN 'Espana'
+    WHEN LOWER(account) LIKE '%paragua%' THEN 'Paraguay'
+    WHEN LOWER(account) LIKE '%peru%' OR LOWER(account) LIKE '%perú%' THEN 'Peru'
+    WHEN LOWER(account) LIKE '%portug%' THEN 'Portugal'
+    WHEN LOWER(account) LIKE '%aleman%' OR LOWER(account) LIKE '%german%' THEN 'Alemania'
+    ELSE 'Other'
+  END AS country_code
+FROM (
+  SELECT
+    account,
+    ROW_NUMBER() OVER (PARTITION BY account ORDER BY account) AS rn
+  FROM ${ref("ad_insights")}
+  WHERE account IS NOT NULL
+)
+WHERE rn = 1

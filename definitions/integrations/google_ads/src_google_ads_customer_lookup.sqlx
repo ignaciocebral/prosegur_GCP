@@ -1,0 +1,40 @@
+// Sirve para convertir cada customer_id de Google Ads en una única fila limpia con el nombre de la cuenta y su país
+  derivado.
+
+
+config {
+  type: "table",
+  schema: dataform.projectConfig.vars.TRANSFORMATIONS_DATASET,
+  tags: ["marketing", "google_ads", "lookup"],
+  description: "Latest Google Ads customer lookup with account name and derived country code."
+}
+
+SELECT
+  customer_id,
+  customer_descriptive_name,
+  CASE
+    WHEN REGEXP_CONTAINS(LOWER(customer_descriptive_name), r'argentin') THEN 'Argentina'
+    WHEN REGEXP_CONTAINS(LOWER(customer_descriptive_name), r'brasil|brazil') THEN 'Brasil'
+    WHEN REGEXP_CONTAINS(LOWER(customer_descriptive_name), r'colombi') THEN 'Colombia'
+    WHEN REGEXP_CONTAINS(LOWER(customer_descriptive_name), r'peru|perú') THEN 'Peru'
+    WHEN REGEXP_CONTAINS(LOWER(customer_descriptive_name), r'espana|spain|corporativ') THEN 'Espana'
+    WHEN REGEXP_CONTAINS(LOWER(customer_descriptive_name), r'paraguay') THEN 'Paraguay'
+    WHEN REGEXP_CONTAINS(LOWER(customer_descriptive_name), r'chile') THEN 'Chile'
+    WHEN REGEXP_CONTAINS(LOWER(customer_descriptive_name), r'portugal') THEN 'Portugal'
+    WHEN REGEXP_CONTAINS(LOWER(customer_descriptive_name), r'alemania|germany|deutschland') THEN 'Alemania'
+    ELSE 'Other'
+  END AS country_code
+FROM (
+  SELECT
+    customer_id,
+    customer_descriptive_name,
+    _LATEST_DATE,
+    _DATA_DATE,
+    ROW_NUMBER() OVER (
+      PARTITION BY customer_id
+      ORDER BY _LATEST_DATE DESC, _DATA_DATE DESC
+    ) AS rn
+  FROM ${ref("ads_Customer_1534842056")}
+  WHERE customer_id = CAST(${dataform.projectConfig.vars.GOOGLE_ADS_CUSTOMER_ID} AS INT64)
+)
+WHERE rn = 1

@@ -1,5 +1,4 @@
-function countryCodeFromCustomerNameSQL(columnName) {
-  return `
+function countryCodeFromCustomerNameSQL(columnName) { return `
     CASE
       WHEN REGEXP_CONTAINS(LOWER(${columnName}), r'argentin') THEN 'Argentina'
       WHEN REGEXP_CONTAINS(LOWER(${columnName}), r'brasil|brazil') THEN 'Brasil'
@@ -15,13 +14,13 @@ function countryCodeFromCustomerNameSQL(columnName) {
   `;
 }
 
-function parseGoogleAdsCustomerId(rawValue) {
+function parseGoogleAdsCustomerId(rawValue) {     //convierte el valor de la variable GOOGLE_ADS_CUSTOMER_ID en un número usable.
   const parsed = Number.parseInt(String(rawValue || "0"), 10);
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function buildGoogleAdsIncrementalDateCheckpointSql(
-  selfRef,
+function buildGoogleAdsIncrementalDateCheckpointSql(  //construye el SQL que decide desde qué fecha volver a recalcular un incremental.
+  selfRef, 
   rawValue,
   customerIdColumnName = "customer_id",
   dateColumnName = "date"
@@ -44,8 +43,7 @@ function buildGoogleAdsIncrementalDateCheckpointSql(
   `;
 }
 
-module.exports = {
-  countryCodeFromCustomerNameSQL,
+module.exports = {     //“expone” funciones o constantes para que otros archivos las puedan usar con require(...).
   parseGoogleAdsCustomerId,
   buildGoogleAdsIncrementalDateCheckpointSql
 };
