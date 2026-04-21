@@ -11,7 +11,7 @@ Traceability used in this audit:
 
 ## Current SQLX logic
 
-File: `definitions/integrations/google_ads/src_google_ads_performance.sqlx`
+File: `definitions/custom/02_intermediate/src_google_ads_performance.sqlx`
 
 There is currently one active conversion bucketing block in the model:
 

@@ -7,7 +7,7 @@ Source validation used in this audit:
 
 ## Current SQLX logic
 
-File: `definitions/integrations/meta_ads/src_meta_ads_ad_daily.sqlx`
+File: `definitions/custom/02_intermediate/src_meta_ads_ad_daily.sqlx`
 
 - `conversions_cmb`: any conversion name matching `%cmb%`
 - `conversions_form`: only `Form`, `form`, `Formulario Contacto`

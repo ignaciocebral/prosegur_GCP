@@ -37,7 +37,7 @@ This session focused on reviewing and improving the ETL architecture of the `ga4
 
 These models were left out of the active architecture with `disabled: true`:
 
-- `definitions/integrations/meta_ads/src_meta_ads_campaign_daily.sqlx`
+- `definitions/custom/02_intermediate/src_meta_ads_campaign_daily.sqlx`
 - `definitions/custom/03_outputs/mart_google_ads_performance.sqlx`
 - `definitions/custom/03_outputs/mart_meta_ads_performance.sqlx`
 
@@ -54,7 +54,7 @@ Google Ads conversion mapping was audited using:
 ### Outcomes
 
 - Added `includes/custom/google_ads_conversion_mapping.js`
-- Cleaned and updated `definitions/integrations/google_ads/src_google_ads_performance.sqlx`
+- Cleaned and updated `definitions/custom/02_intermediate/src_google_ads_performance.sqlx`
 - Added explicit handling for:
   - CRM families such as `Cualificado*`, `Positivo*`, `Formulario_04*`
   - Paraguay GA4-imported conversions
@@ -80,7 +80,7 @@ Meta conversion mapping was audited using:
 ### Outcomes
 
 - Added `includes/custom/meta_ads_conversion_mapping.js`
-- Updated `definitions/integrations/meta_ads/src_meta_ads_ad_daily.sqlx`
+- Updated `definitions/custom/02_intermediate/src_meta_ads_ad_daily.sqlx`
 - Added support for:
   - `c2c`
   - `click to call`
@@ -101,13 +101,13 @@ Meta conversion mapping was audited using:
 
 To reduce duplication without over-fragmenting the graph:
 
-- Added `definitions/integrations/google_ads/src_google_ads_campaign_lookup.sqlx`
-- Added `definitions/integrations/google_ads/src_google_ads_customer_lookup.sqlx`
+- Added `definitions/custom/02_intermediate/src_google_ads_campaign_lookup.sqlx`
+- Added `definitions/custom/02_intermediate/src_google_ads_customer_lookup.sqlx`
 
 Updated consumers:
 
-- `definitions/integrations/google_ads/src_google_ads_performance.sqlx`
-- `definitions/integrations/google_ads/src_google_ads_click_mapping.sqlx`
+- `definitions/custom/02_intermediate/src_google_ads_performance.sqlx`
+- `definitions/custom/02_intermediate/src_google_ads_click_mapping.sqlx`
 
 ## Mapping Coverage Assertions
 
