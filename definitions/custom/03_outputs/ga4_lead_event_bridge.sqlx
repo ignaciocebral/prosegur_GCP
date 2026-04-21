@@ -1,0 +1,95 @@
+config {
+  type: "incremental",
+  schema: dataform.projectConfig.vars.OUTPUTS_DATASET,
+  tags: [dataform.projectConfig.vars.LABEL_EXECUTION_OPERATION, "lead_bridge", "ga4", "events"],
+  description: "Lightweight GA4 lead bridge for IdLead-based joins into cc_gold and sales_gold without querying ga4_events directly.",
+  bigquery: {
+    partitionBy: "event_date",
+    clusterBy: ["IdLead", "session_id"]
+  }
+}
+
+pre_operations {
+  declare date_checkpoint DATE;
+  set date_checkpoint = (
+    ${when(incremental(),
+      `SELECT COALESCE(DATE_SUB(MAX(event_date), INTERVAL 3 DAY), DATE('2020-01-01')) FROM ${self()}`,
+      `SELECT DATE('2020-01-01')`
+    )}
+  );
+  ${when(incremental(),
+    `DELETE FROM ${self()} WHERE event_date >= date_checkpoint`
+  )}
+}
+
+WITH lead_events AS (
+  SELECT
+    e.event_date,
+    e.time.event_timestamp_utc AS event_timestamp_utc,
+    e.event_id,
+    e.session_id,
+    e.event_params_custom.IdLead AS IdLead,
+    e.event_name,
+    e.geo.country AS country,
+    e.page.path AS page_path,
+    e.device.category AS device_category,
+    CASE
+      WHEN s.session_id IS NOT NULL THEN s.last_non_direct_traffic_source.source
+      ELSE e.fixed_traffic_source.source
+    END AS source,
+    CASE
+      WHEN s.session_id IS NOT NULL THEN s.last_non_direct_traffic_source.medium
+      ELSE e.fixed_traffic_source.medium
+    END AS medium,
+    CASE
+      WHEN s.session_id IS NOT NULL THEN "session"
+      ELSE "event_fallback"
+    END AS source_medium_scope,
+    REGEXP_CONTAINS(LOWER(e.event_name), r"cmb") AS is_cmb,
+    REGEXP_CONTAINS(LOWER(e.event_name), r"form")
+      AND NOT REGEXP_CONTAINS(LOWER(e.event_name), r"formulario") AS is_form,
+    REGEXP_CONTAINS(LOWER(e.event_name), r"c2c") AS is_c2c,
+    e.event_name = "generate_lead" AS is_generate_lead
+  FROM ${ref("ga4_events")} e
+  LEFT JOIN ${ref("ga4_sessions")} s
+    ON e.session_id = s.session_id
+  WHERE e.event_date >= date_checkpoint
+    AND e.event_params_custom.IdLead IS NOT NULL
+    AND e.event_params_custom.IdLead != ""
+    AND (
+      REGEXP_CONTAINS(LOWER(e.event_name), r"cmb")
+      OR (
+        REGEXP_CONTAINS(LOWER(e.event_name), r"form")
+        AND NOT REGEXP_CONTAINS(LOWER(e.event_name), r"formulario")
+      )
+      OR REGEXP_CONTAINS(LOWER(e.event_name), r"c2c")
+      OR e.event_name = "generate_lead"
+    )
+)
+
+SELECT
+  event_date,
+  event_timestamp_utc,
+  event_id,
+  session_id,
+  IdLead,
+  event_name,
+  country,
+  page_path,
+  device_category,
+  source,
+  medium,
+  source_medium_scope,
+  ROW_NUMBER() OVER (
+    PARTITION BY IdLead
+    ORDER BY event_timestamp_utc ASC, event_id ASC
+  ) AS idlead_event_rank,
+  ROW_NUMBER() OVER (
+    PARTITION BY IdLead
+    ORDER BY event_timestamp_utc ASC, event_id ASC
+  ) = 1 AS is_primary_idlead_event,
+  is_cmb,
+  is_form,
+  is_c2c,
+  is_generate_lead
+FROM lead_events
