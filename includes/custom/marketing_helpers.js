@@ -76,9 +76,12 @@ const GOOGLE_ADS_CALL_ACTION_NAMES = [
 ];
 
 const GOOGLE_ADS_NO_GESTIONADO_ACTION_NAMES = [
-  "No Cualificado",
-  "NoUtil_formulario_02",
   "No Gestionado_formulario"
+];
+
+const GOOGLE_ADS_NO_CUALIFICADO_ACTION_NAMES = [
+  "No Cualificado",
+  "NoUtil_formulario_02"
 ];
 
 const GOOGLE_ADS_IGNORED_ACTION_NAMES = [
@@ -115,10 +118,16 @@ const GOOGLE_ADS_CONVERSION_AUDIT = [
     reason: "Offline or imported CRM stage actions confirmed in Google Ads API."
   },
   {
-    action_name: "No Cualificado, NoUtil_formulario_02, No Gestionado*",
+    action_name: "No Gestionado*",
     recommended_bucket: "no_gestionado",
     scope: "BR, CO and any account reusing the same naming",
-    reason: "These names represent negative or unmanaged lead states and should not fall into crm."
+    reason: "These names represent unmanaged lead states and should stay separate from disqualified outcomes."
+  },
+  {
+    action_name: "No Cualificado, NoUtil_formulario_02",
+    recommended_bucket: "no_cualificado",
+    scope: "BR, CO and any account reusing the same naming",
+    reason: "These names represent disqualified or invalid lead outcomes and should not fall into no_gestionado."
   },
   {
     action_name: "Visita, CIPHER - Visita",
@@ -157,6 +166,9 @@ function buildGoogleAdsConversionBucketSql(columnName) {
       `${columnName} IN (${sqlInList(GOOGLE_ADS_NO_GESTIONADO_ACTION_NAMES)})`,
       `${columnName} LIKE '%No Gestionado%'`,
       `${columnName} LIKE '%NoGestionado%'`
+    ].join(" OR "),
+    noCualificado: [
+      `${columnName} IN (${sqlInList(GOOGLE_ADS_NO_CUALIFICADO_ACTION_NAMES)})`
     ].join(" OR ")
   };
 }

@@ -69,7 +69,7 @@ WITH google_ads AS (
     conversions_crm AS platform_conversions_crm,
     conversions_visita AS platform_conversions_visita,
     conversions_no_gestionado AS platform_conversions_no_gestionado,
-    CAST(0 AS FLOAT64) AS platform_conversions_no_cualificado,
+    conversions_no_cualificado AS platform_conversions_no_cualificado,
     CAST(0 AS FLOAT64) AS platform_conversions_cualificado_negativo,
     conversions_total AS platform_conversions_total,
     conversions_value_total AS platform_conversions_value

@@ -117,6 +117,8 @@ conversion_stats AS (                                          // Construye las 
          THEN ac.metrics_conversions ELSE 0 END) AS conversions_visita,
     SUM(CASE WHEN ${adConversionBuckets.noGestionado}
          THEN ac.metrics_conversions ELSE 0 END) AS conversions_no_gestionado,
+    SUM(CASE WHEN ${adConversionBuckets.noCualificado}
+         THEN ac.metrics_conversions ELSE 0 END) AS conversions_no_cualificado,
     SUM(CASE WHEN NOT (${adIgnoredActionsSql})
          THEN ac.metrics_conversions ELSE 0 END) AS conversions_total,
     SUM(CASE WHEN NOT (${adIgnoredActionsSql})
@@ -149,6 +151,8 @@ conversion_stats AS (                                          // Construye las 
          THEN ccs.metrics_conversions ELSE 0 END) AS conversions_visita,
     SUM(CASE WHEN ${campaignConversionBuckets.noGestionado}
          THEN ccs.metrics_conversions ELSE 0 END) AS conversions_no_gestionado,
+    SUM(CASE WHEN ${campaignConversionBuckets.noCualificado}
+         THEN ccs.metrics_conversions ELSE 0 END) AS conversions_no_cualificado,
     SUM(CASE WHEN NOT (${campaignIgnoredActionsSql})
          THEN ccs.metrics_conversions ELSE 0 END) AS conversions_total,
     SUM(CASE WHEN NOT (${campaignIgnoredActionsSql})
@@ -251,6 +255,7 @@ SELECT
   COALESCE(c.conversions_crm, 0) AS conversions_crm,
   COALESCE(c.conversions_visita, 0) AS conversions_visita,
   COALESCE(c.conversions_no_gestionado, 0) AS conversions_no_gestionado,
+  COALESCE(c.conversions_no_cualificado, 0) AS conversions_no_cualificado,
   COALESCE(c.conversions_total, 0) AS conversions_total,
   COALESCE(c.conversions_value_total, 0) AS conversions_value_total
 

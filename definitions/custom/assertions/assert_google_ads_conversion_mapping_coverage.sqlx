@@ -21,7 +21,8 @@ js {
     adBuckets.form,
     adBuckets.call,
     adBuckets.visita,
-    adBuckets.noGestionado
+    adBuckets.noGestionado,
+    adBuckets.noCualificado
   ].join(" OR ");
   const customerFilterSql = googleAdsCustomerId !== 0
     ? `customer_id = CAST(${googleAdsCustomerId} AS INT64)`

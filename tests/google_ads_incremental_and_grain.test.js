@@ -107,9 +107,15 @@ assert.ok(
 );
 
 assert.ok(
-  bucketSql.noGestionado.includes("No Cualificado") &&
-  bucketSql.noGestionado.includes("NoUtil_formulario_02"),
-  "Negative lead states should be mapped to no_gestionado."
+  bucketSql.noGestionado.includes("No Gestionado_formulario") &&
+  !bucketSql.noGestionado.includes("No Cualificado"),
+  "No Gestionado actions should stay isolated from disqualified outcomes."
+);
+
+assert.ok(
+  bucketSql.noCualificado.includes("No Cualificado") &&
+  bucketSql.noCualificado.includes("NoUtil_formulario_02"),
+  "Disqualified Google Ads lead states should map to no_cualificado."
 );
 
 assert.ok(
