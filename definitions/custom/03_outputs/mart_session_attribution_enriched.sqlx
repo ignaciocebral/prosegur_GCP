@@ -12,7 +12,7 @@ config {
   type: "incremental",
   schema: dataform.projectConfig.vars.OUTPUTS_DATASET,
   tags: [dataform.projectConfig.vars.LABEL_EXECUTION_OPERATION, "attribution", "sessions", "mart"],
-  description: "Thin reporting mart over the staging attribution model. Reuses precomputed session attribution, landing page, channel, and paid-media enrichment fields.",
+  description: "Final session mart. Grain: 1 row per session_id. Includes GA4 raw attribution, GA4 last non-direct attribution, canonical channel fields (channel, matched_platform, match_method), landing page fields, and paid-media match detail. Campaign-platform metrics such as impressions, clicks, and spend live in mart_campaign_performance_daily, not here.",
   bigquery: {
     partitionBy: "session_date",
     clusterBy: ["session_id", "source", "medium"]
@@ -31,6 +31,14 @@ pre_operations {
     `DELETE FROM ${self()} WHERE session_date >= date_checkpoint`
   )}
 }
+
+-- Contract:
+-- Grain: 1 row = 1 session_id.
+-- GA4 raw fields: source, medium, campaign, campaign_id, term, content, default_channel_grouping.
+-- GA4 last non-direct fields: lnd_source, lnd_medium, lnd_campaign, lnd_campaign_id, lnd_default_channel_grouping.
+-- Canonical analysis fields: channel, matched_platform, match_method.
+-- Paid enrichment: matched_* columns plus paid_attribution.google_ads / paid_attribution.meta_ads.
+-- Out of scope: campaign-level media metrics such as impressions, clicks, spend, CTR, CPC, CPM.
 
 SELECT
   CURRENT_TIMESTAMP() AS _run_timestamp,

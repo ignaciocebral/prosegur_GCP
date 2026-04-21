@@ -188,7 +188,6 @@ SELECT
   session_id,
   session_date,
   user_pseudo_id,
-  property_id,
   landing_page_path,
   landing_content_group,
   source,
@@ -240,6 +239,12 @@ SELECT
     WHEN COALESCE(default_channel_grouping, lnd_default_channel_grouping) IS NULL THEN 'unassigned'
     ELSE LOWER(REPLACE(COALESCE(default_channel_grouping, lnd_default_channel_grouping), ' ', '_'))
   END AS channel,
+  COALESCE(google_customer_id, meta_account_id) AS matched_account_id,
+  COALESCE(google_account_name, meta_account_name) AS matched_account_name,
+  COALESCE(google_campaign_id, meta_campaign_id) AS matched_campaign_id,
+  COALESCE(google_campaign_name, meta_campaign_name) AS matched_campaign_name,
+  COALESCE(google_ad_group_id, meta_adset_id) AS matched_ad_group_or_adset_id,
+  COALESCE(google_ad_group_name, meta_adset_name) AS matched_ad_group_or_adset_name,
   STRUCT(
     STRUCT(
       google_matched_date AS matched_date,
