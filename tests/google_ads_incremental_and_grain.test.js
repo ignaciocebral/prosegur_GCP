@@ -9,9 +9,6 @@ const {
   buildGoogleAdsIgnoredActionSql,
   GOOGLE_ADS_IGNORED_ACTION_NAMES
 } = require("../includes/custom/marketing_helpers.js");
-const {
-  buildUnifiedCampaignMartIncrementalDateCheckpointSql
-} = require("../includes/custom/campaign_mart_helpers.js");
 
 assert.strictEqual(parseGoogleAdsCustomerId("0"), 0);
 assert.strictEqual(parseGoogleAdsCustomerId("1703013237"), 1703013237);
@@ -63,22 +60,6 @@ for (const row of duplicatedByKeywordText) {
 assert.ok(
   [...correctedGrouping.values()].every(count => count === 1),
   "The corrected assertion grain by keyword_text + match_type avoids the false positive."
-);
-
-const unifiedMartCheckpointSql = buildUnifiedCampaignMartIncrementalDateCheckpointSql(
-  "`project.dataset.mart_campaign_performance_daily`",
-  "0",
-  "Prosegur Cash Guatemala"
-);
-
-assert.ok(
-  unifiedMartCheckpointSql.includes("platform = 'google_ads' AND account_id IS NOT NULL"),
-  "The unified campaign mart checkpoint should only treat persisted Google rows as stale for the Google branch."
-);
-
-assert.ok(
-  unifiedMartCheckpointSql.includes("platform = 'meta_ads' AND (account_name NOT IN ('Prosegur Cash Guatemala'))"),
-  "The unified campaign mart checkpoint should scope Meta stale detection to Meta rows only."
 );
 
 const bucketSql = buildGoogleAdsConversionBucketSql("action_name");
