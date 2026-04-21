@@ -10,10 +10,11 @@ Retention: Permanent - Required staging bridge for paid attribution enrichment.
 
 -- This file creates the Google Ads bridge that links gclid-bearing sessions to Ads metadata at one row per gclid and date.
 config {
+  disabled: true,
   type: "incremental",
   schema: dataform.projectConfig.vars.TRANSFORMATIONS_DATASET,
   tags: [dataform.projectConfig.vars.LABEL_EXECUTION_OPERATION, "attribution", "google_ads"],
-  description: "Google Ads deterministic bridge with one row per gclid and date.",
+  description: "Deprecated: Google Ads bridge logic now lives inside int_session_paid_attribution.",
   bigquery: {
     partitionBy: "date",
     clusterBy: ["gclid"]

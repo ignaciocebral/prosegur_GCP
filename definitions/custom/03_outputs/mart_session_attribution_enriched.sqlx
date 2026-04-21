@@ -1,10 +1,10 @@
 /*
 """
-Description: Reporting mart for session-grain paid attribution.
+Description: Reporting mart for session-grain all-channel attribution.
 Author: Codex
 Date: 2026-04-17
 Purpose: Production
-Retention: Permanent - Output layer for paid attribution analysis.
+Retention: Permanent - Output layer for session attribution analysis.
 """
 */
 
@@ -12,7 +12,7 @@ config {
   type: "incremental",
   schema: dataform.projectConfig.vars.OUTPUTS_DATASET,
   tags: [dataform.projectConfig.vars.LABEL_EXECUTION_OPERATION, "attribution", "sessions", "mart"],
-  description: "Thin reporting mart over the staging attribution model. Reuses precomputed paid-media enrichment fields.",
+  description: "Thin reporting mart over the staging attribution model. Reuses precomputed session attribution, landing page, channel, and paid-media enrichment fields.",
   bigquery: {
     partitionBy: "session_date",
     clusterBy: ["session_id", "source", "medium"]

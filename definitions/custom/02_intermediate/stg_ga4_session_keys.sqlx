@@ -40,6 +40,8 @@ SELECT
   s.session_date,
   s.user_pseudo_id,
   s.property_id,
+  s.landing_page.landing_page_path AS landing_page_path,
+  s.landing_page.landing_content_group AS landing_content_group,
   s.session_source.source AS source,
   s.session_source.medium AS medium,
   s.session_source.campaign AS campaign,

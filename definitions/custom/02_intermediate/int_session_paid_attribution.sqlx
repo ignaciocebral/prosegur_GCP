@@ -4,16 +4,17 @@ Description: Produces a session-grain staging table enriched with deterministic 
 Author: Codex
 Date: 2026-04-17
 Purpose: Production
-Retention: Permanent - Paid-media attribution staging layer.
+Retention: Permanent - Session attribution staging layer with all-channel classification and paid-media enrichment.
 """
 */
 
--- This file enriches each session with the best available Google Ads or Meta Ads match and builds the paid_attribution struct.
+-- This file enriches each session with the best available Google Ads or Meta Ads match, classifies every session into a canonical channel,
+-- and builds the paid_attribution struct used by the final session mart.
 config {
   type: "incremental",
   schema: dataform.projectConfig.vars.TRANSFORMATIONS_DATASET,
   tags: [dataform.projectConfig.vars.LABEL_EXECUTION_OPERATION, "attribution", "sessions", "staging"],
-  description: "Session-grain staging table with deterministic paid-media enrichment and the final paid_attribution struct.",
+  description: "Session-grain staging table with canonical all-channel classification, landing page context, and deterministic paid-media enrichment.",
   bigquery: {
     partitionBy: "session_date",
     clusterBy: ["session_id", "source", "medium"]
@@ -41,10 +42,79 @@ WITH base AS (
   WHERE session_date >= date_checkpoint
 ),
 
--- This CTE exposes the deterministic Google Ads bridge as the join target for gclid-based attribution.
-google_joined AS (
+-- This CTE aggregates ad group performance so duplicate Google click mappings can be ranked by the strongest available activity signal.
+google_perf AS (
   SELECT *
-  FROM ${ref("int_google_ads_session_bridge")}
+  FROM (
+    SELECT
+      segments_date AS date,
+      customer_id,
+      campaign_id,
+      ad_group_id,
+      SUM(metrics_impressions) AS impressions,
+      SUM(metrics_clicks) AS clicks,
+      SUM(metrics_cost_micros) / 1000000 AS spend
+    FROM ${ref("ads_AdGroupStats_1534842056")}
+    WHERE customer_id = CAST(${dataform.projectConfig.vars.GOOGLE_ADS_CUSTOMER_ID} AS INT64)
+      AND segments_date >= date_checkpoint
+    GROUP BY 1, 2, 3, 4
+  )
+),
+
+-- This CTE joins raw Google click mappings with performance signals before choosing a single deterministic row per gclid and date.
+google_bridge_candidates AS (
+  SELECT
+    c.gclid,
+    c.date,
+    c.customer_id,
+    c.account_name,
+    c.campaign_id,
+    c.campaign_name,
+    c.ad_group_id,
+    c.ad_group_name,
+    c.keyword_text,
+    c.keyword_match_text,
+    c.keyword_match_type,
+    COALESCE(p.impressions, 0) AS impressions,
+    COALESCE(p.clicks, 0) AS clicks,
+    COALESCE(p.spend, 0) AS spend
+  FROM ${ref("src_google_ads_click_mapping")} c
+  LEFT JOIN google_perf p
+    ON c.date = p.date
+    AND c.customer_id = p.customer_id
+    AND c.campaign_id = p.campaign_id
+    AND c.ad_group_id = p.ad_group_id
+  WHERE c.gclid IS NOT NULL
+    AND c.date >= date_checkpoint
+),
+
+-- This CTE keeps one deterministic Google Ads match per gclid and date.
+google_joined AS (
+  SELECT
+    gclid,
+    date,
+    CAST(customer_id AS STRING) AS customer_id,
+    account_name,
+    CAST(campaign_id AS STRING) AS campaign_id,
+    campaign_name,
+    CAST(ad_group_id AS STRING) AS ad_group_id,
+    ad_group_name,
+    keyword_text,
+    keyword_match_text,
+    keyword_match_type,
+    impressions,
+    clicks,
+    spend
+  FROM (
+    SELECT
+      *,
+      ROW_NUMBER() OVER (
+        PARTITION BY gclid, date
+        ORDER BY clicks DESC, spend DESC, campaign_id DESC, ad_group_id DESC
+      ) AS rn
+    FROM google_bridge_candidates
+  )
+  WHERE rn = 1
 ),
 
 -- This CTE aggregates Meta to campaign grain so sessions can still be matched when only campaign-level UTM data is available.
@@ -146,6 +216,8 @@ SELECT
   session_date,
   user_pseudo_id,
   property_id,
+  landing_page_path,
+  landing_content_group,
   source,
   medium,
   campaign,
@@ -164,6 +236,37 @@ SELECT
   lnd_campaign,
   lnd_campaign_id,
   lnd_default_channel_grouping,
+  CASE
+    WHEN google_matched_gclid IS NOT NULL THEN 'google_ads'
+    WHEN meta_campaign_id IS NOT NULL THEN 'meta_ads'
+    ELSE NULL
+  END AS matched_platform,
+  CASE
+    WHEN google_matched_gclid IS NOT NULL THEN 'gclid'
+    WHEN meta_campaign_id IS NOT NULL THEN 'campaign_name'
+    ELSE 'none'
+  END AS match_method,
+  CASE
+    WHEN google_matched_gclid IS NOT NULL THEN 'paid_search'
+    WHEN meta_campaign_id IS NOT NULL THEN 'paid_social'
+    WHEN session_gclid IS NOT NULL
+      OR session_dclid IS NOT NULL
+      OR session_gbraid IS NOT NULL
+      OR session_wbraid IS NOT NULL
+      OR session_msclkid IS NOT NULL THEN 'paid_search'
+    WHEN LOWER(COALESCE(source, '')) IN ('meta', 'facebook', 'fb', 'ig', 'instagram', 'facebook.com', 'l.facebook.com', 'lm.facebook.com')
+      AND REGEXP_CONTAINS(LOWER(COALESCE(medium, '')), r'(cpc|ppc|paid|social)') THEN 'paid_social'
+    WHEN LOWER(COALESCE(default_channel_grouping, lnd_default_channel_grouping, '')) = 'paid social' THEN 'paid_social'
+    WHEN LOWER(COALESCE(default_channel_grouping, lnd_default_channel_grouping, '')) = 'paid search' THEN 'paid_search'
+    WHEN LOWER(COALESCE(default_channel_grouping, lnd_default_channel_grouping, '')) = 'organic search' THEN 'organic_search'
+    WHEN LOWER(COALESCE(default_channel_grouping, lnd_default_channel_grouping, '')) = 'organic social' THEN 'organic_social'
+    WHEN LOWER(COALESCE(default_channel_grouping, lnd_default_channel_grouping, '')) = 'display' THEN 'display'
+    WHEN LOWER(COALESCE(default_channel_grouping, lnd_default_channel_grouping, '')) = 'email' THEN 'email'
+    WHEN LOWER(COALESCE(default_channel_grouping, lnd_default_channel_grouping, '')) = 'referral' THEN 'referral'
+    WHEN LOWER(COALESCE(default_channel_grouping, lnd_default_channel_grouping, '')) = 'direct' THEN 'direct'
+    WHEN COALESCE(default_channel_grouping, lnd_default_channel_grouping) IS NULL THEN 'unassigned'
+    ELSE LOWER(REPLACE(COALESCE(default_channel_grouping, lnd_default_channel_grouping), ' ', '_'))
+  END AS channel,
   STRUCT(
     CASE
       WHEN google_matched_gclid IS NOT NULL THEN 'google_gclid'

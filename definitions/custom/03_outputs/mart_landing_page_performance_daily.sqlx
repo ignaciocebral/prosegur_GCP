@@ -10,10 +10,11 @@ Retention: Permanent - Output mart for landing page conversion analysis across a
 */
 
 config {
+  disabled: true,
   type: "incremental",
   schema: dataform.projectConfig.vars.OUTPUTS_DATASET,
   tags: [dataform.projectConfig.vars.LABEL_EXECUTION_OPERATION, "landing_pages", "performance", "mart"],
-  description: "Landing page performance aggregated across ALL channels. Engagement rate, bounce rate, and conversion metrics by page path, channel, source/medium, device, and country.",
+  description: "Deprecated: landing page analysis now lives in the session attribution layer instead of a dedicated landing-page mart.",
   bigquery: {
     partitionBy: "session_date",
     clusterBy: ["landing_page_path", "default_channel_grouping"]
