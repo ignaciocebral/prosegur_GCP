@@ -1,5 +1,5 @@
 config {
-  type: "table",
+  type: "incremental",
   schema: dataform.projectConfig.vars.OUTPUTS_DATASET,
   tags: [dataform.projectConfig.vars.LABEL_EXECUTION_OPERATION, "lead_bridge", "ga4", "events"],
   description: "Lightweight GA4 lead bridge for IdLead-based joins into cc_gold and sales_gold without querying ga4_events directly. source/medium use session last-non-direct attribution when available, else event fixed traffic source.",
@@ -12,16 +12,54 @@ config {
 
 js {
   const { helpers } = require("includes/core/helpers");
-  const { getLeadEventClassifier } = require("includes/custom/ga4_lead_helpers.js");
   const config = helpers.getConfig();
-  const leadEventClassifier = getLeadEventClassifier("e");
+  const leadEventPredicate = `
+    (
+      REGEXP_CONTAINS(LOWER(e.event_name), r'cmb')
+      OR (
+        REGEXP_CONTAINS(LOWER(e.event_name), r'form')
+        AND NOT REGEXP_CONTAINS(LOWER(e.event_name), r'formulario')
+      )
+      OR REGEXP_CONTAINS(LOWER(e.event_name), r'c2c')
+      OR e.event_name = 'generate_lead'
+    )
+  `;
 }
 
 pre_operations {
+  declare date_checkpoint DATE;
   set @@query_label = "${helpers.executionLabels()}";
+  set date_checkpoint = (
+    ${when(incremental(),
+      `SELECT COALESCE(DATE_SUB(MAX(event_date), INTERVAL 3 DAY), DATE('${config.GA4_START_DATE}')) FROM ${self()}`,
+      `SELECT DATE('${config.GA4_START_DATE}')`
+    )}
+  );
+  ${when(incremental(),
+    `DELETE FROM ${self()}
+     WHERE event_date >= date_checkpoint
+        OR IdLead IN (
+          SELECT DISTINCT e.event_params_custom.IdLead
+          FROM ${ref("ga4_events")} e
+          WHERE e.event_date >= date_checkpoint
+            AND e.event_params_custom.IdLead IS NOT NULL
+            AND e.event_params_custom.IdLead != ""
+            AND ${leadEventPredicate}
+        )`
+  )}
 }
 
-WITH lead_events AS (
+WITH touched_idleads AS (
+  SELECT DISTINCT
+    e.event_params_custom.IdLead AS IdLead
+  FROM ${ref("ga4_events")} e
+  WHERE e.event_date >= date_checkpoint
+    AND e.event_params_custom.IdLead IS NOT NULL
+    AND e.event_params_custom.IdLead != ""
+    AND ${leadEventPredicate}
+),
+
+lead_events AS (
   SELECT
     e.event_date,
     e.time.event_timestamp_utc AS event_timestamp_utc,
@@ -49,17 +87,21 @@ WITH lead_events AS (
         THEN "session"
       ELSE "event_fallback"
     END AS source_medium_scope,
-    ${leadEventClassifier.isCmb} AS is_cmb,
-    ${leadEventClassifier.isForm} AS is_form,
-    ${leadEventClassifier.isC2c} AS is_c2c,
-    ${leadEventClassifier.isGenerateLead} AS is_generate_lead
+    REGEXP_CONTAINS(LOWER(e.event_name), r"cmb") AS is_cmb,
+    REGEXP_CONTAINS(LOWER(e.event_name), r"form")
+      AND NOT REGEXP_CONTAINS(LOWER(e.event_name), r"formulario") AS is_form,
+    REGEXP_CONTAINS(LOWER(e.event_name), r"c2c") AS is_c2c,
+    e.event_name = "generate_lead" AS is_generate_lead
   FROM ${ref("ga4_events")} e
   LEFT JOIN ${ref("ga4_sessions")} s
     ON e.session_id = s.session_id
-  WHERE e.event_date >= DATE('${config.GA4_START_DATE}')
-    AND e.event_params_custom.IdLead IS NOT NULL
+  WHERE e.event_params_custom.IdLead IS NOT NULL
     AND e.event_params_custom.IdLead != ""
-    AND ${leadEventClassifier.leadOnlyPredicate}
+    AND (
+      e.event_date >= date_checkpoint
+      OR e.event_params_custom.IdLead IN (SELECT IdLead FROM touched_idleads)
+    )
+    AND ${leadEventPredicate}
 ),
 
 ranked_events AS (
