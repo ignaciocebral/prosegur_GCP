@@ -20,6 +20,11 @@ config {
   }
 }
 
+js {
+  const { getLeadEventClassifier } = require("includes/custom/ga4_lead_helpers.js");
+  const leadEventClassifier = getLeadEventClassifier("e");
+}
+
 pre_operations {
   declare date_checkpoint DATE;
   set date_checkpoint = (
@@ -52,23 +57,16 @@ WITH session_with_conversions AS (
     s.time.engagement_time_msec,
 
     -- Conversion counts per session (same regex patterns as demo_daily_sessions_report)
-    COUNTIF(REGEXP_CONTAINS(LOWER(e.event_name), r'cmb')) AS cmb,
-    COUNTIF(
-      REGEXP_CONTAINS(LOWER(e.event_name), r'form')
-      AND NOT REGEXP_CONTAINS(LOWER(e.event_name), r'formulario')
-    ) AS form,
-    COUNTIF(REGEXP_CONTAINS(LOWER(e.event_name), r'c2c')) AS c2c,
-    COUNTIF(e.event_name = 'generate_lead') AS generate_lead,
+    COUNTIF(${leadEventClassifier.isCmb}) AS cmb,
+    COUNTIF(${leadEventClassifier.isForm}) AS form,
+    COUNTIF(${leadEventClassifier.isC2c}) AS c2c,
+    COUNTIF(${leadEventClassifier.isGenerateLead}) AS generate_lead,
     COUNTIF(e.event_name = 'page_view') AS page_views
 
   FROM ${ref("ga4_sessions")} s
   LEFT JOIN ${ref("ga4_events")} e
     ON s.session_id = e.session_id
-    AND (
-      REGEXP_CONTAINS(LOWER(e.event_name), r'(page_view|cmb|form|c2c)')
-      AND NOT REGEXP_CONTAINS(LOWER(e.event_name), r'formulario')
-      OR e.event_name = 'generate_lead'
-    )
+    AND ${leadEventClassifier.leadOrPageViewPredicate}
   WHERE s.session_date >= date_checkpoint
   GROUP BY ALL
 ),

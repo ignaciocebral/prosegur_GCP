@@ -23,8 +23,10 @@ config {
 
 js {
   const { buildUnifiedCampaignMartIncrementalDateCheckpointSql } = require("includes/custom/campaign_mart_helpers.js");
+  const { getLeadEventClassifier } = require("includes/custom/ga4_lead_helpers.js");
   const googleAdsCustomerIdRaw = dataform.projectConfig.vars.GOOGLE_ADS_CUSTOMER_ID || "0";
   const metaAccountNamesRaw = dataform.projectConfig.vars.META_ADS_ACCOUNT_NAMES || "";
+  const leadEventClassifier = getLeadEventClassifier("e");
   const unifiedCampaignMartCheckpointSql = buildUnifiedCampaignMartIncrementalDateCheckpointSql(
     self(),
     googleAdsCustomerIdRaw,
@@ -163,13 +165,10 @@ ga4_conversions_by_campaign AS (
     ) AS ad_group_or_adset_id,
 
     -- GA4 web conversions (matching demo_daily_sessions_report patterns)
-    COUNTIF(REGEXP_CONTAINS(LOWER(e.event_name), r'cmb')) AS ga4_conversions_cmb,
-    COUNTIF(
-      REGEXP_CONTAINS(LOWER(e.event_name), r'form')
-      AND NOT REGEXP_CONTAINS(LOWER(e.event_name), r'formulario')
-    ) AS ga4_conversions_form,
-    COUNTIF(REGEXP_CONTAINS(LOWER(e.event_name), r'c2c')) AS ga4_conversions_c2c,
-    COUNTIF(e.event_name = 'generate_lead') AS ga4_conversions_generate_lead,
+    COUNTIF(${leadEventClassifier.isCmb}) AS ga4_conversions_cmb,
+    COUNTIF(${leadEventClassifier.isForm}) AS ga4_conversions_form,
+    COUNTIF(${leadEventClassifier.isC2c}) AS ga4_conversions_c2c,
+    COUNTIF(${leadEventClassifier.isGenerateLead}) AS ga4_conversions_generate_lead,
     COUNTIF(e.event_name = 'page_view') AS ga4_page_views
 
   FROM ${ref("mart_session_attribution_enriched")} m
@@ -177,11 +176,7 @@ ga4_conversions_by_campaign AS (
     ON m.session_id = e.session_id
   WHERE m.paid_attribution.attribution_source IN ('google_gclid', 'meta_campaign_id')
     AND m.session_date >= date_checkpoint
-    AND (
-      REGEXP_CONTAINS(LOWER(e.event_name), r'(page_view|cmb|form|c2c)')
-      AND NOT REGEXP_CONTAINS(LOWER(e.event_name), r'formulario')
-      OR e.event_name = 'generate_lead'
-    )
+    AND ${leadEventClassifier.leadOrPageViewPredicate}
   GROUP BY 1, 2, 3, 4
 ),
 

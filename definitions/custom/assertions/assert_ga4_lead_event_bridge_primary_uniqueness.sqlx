@@ -1,0 +1,13 @@
+config {
+  type: "assertion",
+  schema: dataform.projectConfig.vars.QUALITY_DATASET,
+  tags: [dataform.projectConfig.vars.LABEL_EXECUTION_OPERATION, "lead_bridge", "quality"],
+  description: "Asserts at most one primary event row per IdLead in ga4_lead_event_bridge."
+}
+
+SELECT
+  IdLead,
+  COUNTIF(is_primary_idlead_event) AS primary_rows
+FROM ${ref("ga4_lead_event_bridge")}
+GROUP BY 1
+HAVING COUNTIF(is_primary_idlead_event) > 1
