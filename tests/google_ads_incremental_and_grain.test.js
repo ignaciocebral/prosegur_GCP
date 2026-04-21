@@ -3,7 +3,7 @@ const assert = require("assert");
 const {
   parseGoogleAdsCustomerId,
   buildGoogleAdsIncrementalDateCheckpointSql
-} = require("../includes/custom/google_ads_helpers.js");
+} = require("../includes/custom/marketing_helpers.js");
 const {
   buildGoogleAdsConversionBucketSql,
   buildGoogleAdsIgnoredActionSql,
@@ -128,4 +128,4 @@ assert.ok(
   "Ignored Google Ads actions should be reusable in SQL to exclude them from downstream conversion totals."
 );
 
-console.log("google ads incremental + grain regression tests passed");
+console.log("marketing helpers google ads regression tests passed");

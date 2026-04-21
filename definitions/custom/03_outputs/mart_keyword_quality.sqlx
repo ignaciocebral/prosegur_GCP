@@ -38,7 +38,7 @@ pre_operations {
 js {
   const {
     buildGoogleAdsIncrementalDateCheckpointSql
-  } = require("includes/custom/google_ads_helpers.js");
+  } = require("includes/custom/marketing_helpers.js");
   const googleAdsCustomerIdRaw = dataform.projectConfig.vars.GOOGLE_ADS_CUSTOMER_ID || "0";
 }
 

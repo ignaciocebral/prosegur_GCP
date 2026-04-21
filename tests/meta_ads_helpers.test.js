@@ -5,7 +5,7 @@ const {
   buildMetaAccountFilterSql,
   buildMetaDisallowedAccountsSql,
   buildMetaIncrementalDateCheckpointSql
-} = require("../includes/custom/meta_ads_helpers.js");
+} = require("../includes/custom/marketing_helpers.js");
 const {
   buildMetaAdsConversionBucketSql,
   META_ADS_REVIEW_CONVERSION_NAMES
@@ -99,4 +99,4 @@ assert.ok(
   "Meta review exclusions should keep unresolved live-only events out of the mapping assertion."
 );
 
-console.log("meta_ads_helpers regression tests passed");
+console.log("marketing helpers meta ads regression tests passed");

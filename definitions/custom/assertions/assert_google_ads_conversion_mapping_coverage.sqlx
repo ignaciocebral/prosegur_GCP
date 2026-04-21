@@ -8,7 +8,7 @@ config {
 js {
   const {
     parseGoogleAdsCustomerId
-  } = require("includes/custom/google_ads_helpers.js");
+  } = require("includes/custom/marketing_helpers.js");
   const {
     buildGoogleAdsConversionBucketSql,
     buildGoogleAdsExcludedFromCoverageSql

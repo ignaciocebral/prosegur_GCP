@@ -1,5 +1,7 @@
-const { parseGoogleAdsCustomerId } = require("./google_ads_helpers.js");
-const { buildMetaDisallowedAccountsSql } = require("./meta_ads_helpers.js");
+const {
+  parseGoogleAdsCustomerId,
+  buildMetaDisallowedAccountsSql
+} = require("./marketing_helpers.js");
 
 function buildUnifiedCampaignMartIncrementalDateCheckpointSql(
   selfRef,

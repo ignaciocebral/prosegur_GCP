@@ -28,7 +28,7 @@ pre_operations {  //prepara el incremental antes de ejecutar el SELECT.
 js {   //importa helpers JS y prepara variables reutilizables.
   const {
     buildGoogleAdsIncrementalDateCheckpointSql
-  } = require("includes/custom/google_ads_helpers.js");
+  } = require("includes/custom/marketing_helpers.js");
   const {
     buildGoogleAdsConversionBucketSql,
     buildGoogleAdsIgnoredActionSql
