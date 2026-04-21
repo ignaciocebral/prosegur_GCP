@@ -32,7 +32,7 @@ js {   //importa helpers JS y prepara variables reutilizables.
   const {
     buildGoogleAdsConversionBucketSql,
     buildGoogleAdsIgnoredActionSql
-  } = require("includes/custom/google_ads_conversion_mapping.js");
+  } = require("includes/custom/marketing_helpers.js");
   const googleAdsCustomerIdRaw = dataform.projectConfig.vars.GOOGLE_ADS_CUSTOMER_ID || "0";
   const adConversionBuckets = buildGoogleAdsConversionBucketSql("ac.segments_conversion_action_name");
   const campaignConversionBuckets = buildGoogleAdsConversionBucketSql("ccs.segments_conversion_action_name");

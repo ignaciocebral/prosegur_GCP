@@ -26,7 +26,7 @@ js {
     buildMetaAccountFilterSql,
     buildMetaIncrementalDateCheckpointSql
   } = require("includes/custom/marketing_helpers.js");
-  const { buildMetaAdsConversionBucketSql } = require("includes/custom/meta_ads_conversion_mapping.js");
+  const { buildMetaAdsConversionBucketSql } = require("includes/custom/marketing_helpers.js");
   const metaAccountNamesRaw = dataform.projectConfig.vars.META_ADS_ACCOUNT_NAMES || "";
   const metaAccountFilterSql = buildMetaAccountFilterSql(metaAccountNamesRaw, "account");
   const metaConversionBuckets = buildMetaAdsConversionBucketSql("c.name");

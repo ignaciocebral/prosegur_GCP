@@ -9,7 +9,7 @@ const {
 const {
   buildMetaAdsConversionBucketSql,
   META_ADS_REVIEW_CONVERSION_NAMES
-} = require("../includes/custom/meta_ads_conversion_mapping.js");
+} = require("../includes/custom/marketing_helpers.js");
 
 assert.deepStrictEqual(
   parseMetaAccountNames(" Prosegur Cash Guatemala | Prosegur Cash Paraguay_refresh "),

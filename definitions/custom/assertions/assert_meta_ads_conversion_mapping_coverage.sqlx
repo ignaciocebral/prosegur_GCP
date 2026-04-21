@@ -12,7 +12,7 @@ js {
   const {
     buildMetaAdsConversionBucketSql,
     buildMetaAdsExcludedFromCoverageSql
-  } = require("includes/custom/meta_ads_conversion_mapping.js");
+  } = require("includes/custom/marketing_helpers.js");
 
   const metaAccountNamesRaw = dataform.projectConfig.vars.META_ADS_ACCOUNT_NAMES || "";
   const metaAccountFilterSql = buildMetaAccountFilterSql(metaAccountNamesRaw, "account");

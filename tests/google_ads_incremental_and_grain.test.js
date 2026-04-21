@@ -8,7 +8,7 @@ const {
   buildGoogleAdsConversionBucketSql,
   buildGoogleAdsIgnoredActionSql,
   GOOGLE_ADS_IGNORED_ACTION_NAMES
-} = require("../includes/custom/google_ads_conversion_mapping.js");
+} = require("../includes/custom/marketing_helpers.js");
 const {
   buildUnifiedCampaignMartIncrementalDateCheckpointSql
 } = require("../includes/custom/campaign_mart_helpers.js");

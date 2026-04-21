@@ -12,7 +12,7 @@ js {
   const {
     buildGoogleAdsConversionBucketSql,
     buildGoogleAdsExcludedFromCoverageSql
-  } = require("includes/custom/google_ads_conversion_mapping.js");
+  } = require("includes/custom/marketing_helpers.js");
 
   const googleAdsCustomerId = parseGoogleAdsCustomerId(dataform.projectConfig.vars.GOOGLE_ADS_CUSTOMER_ID || "0");
   const adBuckets = buildGoogleAdsConversionBucketSql("action_name");
