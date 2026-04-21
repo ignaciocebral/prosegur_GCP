@@ -2,7 +2,8 @@ const assert = require("assert");
 
 const {
   parseGoogleAdsCustomerId,
-  buildGoogleAdsIncrementalDateCheckpointSql
+  buildGoogleAdsIncrementalDateCheckpointSql,
+  buildUnifiedCampaignMartIncrementalDateCheckpointSql
 } = require("../includes/custom/marketing_helpers.js");
 const {
   buildGoogleAdsConversionBucketSql,
@@ -29,6 +30,22 @@ assert.ok(
 assert.ok(
   checkpointSqlWhenDisabled.includes("THEN DATE('2020-01-01')"),
   "Google incremental checkpoint should force a full rebuild when stale customer rows are detected."
+);
+
+const campaignCheckpointSql = buildUnifiedCampaignMartIncrementalDateCheckpointSql(
+  "`project.dataset.campaign_mart`",
+  "1703013237",
+  "Meta Account 1|Meta Account 2"
+);
+
+assert.ok(
+  campaignCheckpointSql.includes("platform = 'google_ads'"),
+  "Campaign mart checkpoint should evaluate stale Google Ads rows."
+);
+
+assert.ok(
+  campaignCheckpointSql.includes("platform = 'meta_ads'"),
+  "Campaign mart checkpoint should evaluate stale Meta Ads rows."
 );
 
 const duplicatedByKeywordText = [

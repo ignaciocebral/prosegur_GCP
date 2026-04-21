@@ -125,19 +125,7 @@ meta_campaign_agg AS (
     campaign_name,
     account_id,
     account_name,
-    ad_account_name,
-    SUM(impressions) AS impressions,
-    SUM(clicks) AS clicks,
-    SUM(link_clicks) AS link_clicks,
-    SUM(spend) AS spend,
-    SUM(conversions_cmb) AS conversions_cmb,
-    SUM(conversions_form) AS conversions_form,
-    SUM(conversions_cualificado) AS conversions_cualificado,
-    SUM(conversions_contact) AS conversions_contact,
-    SUM(conversions_no_gestionado) AS conversions_no_gestionado,
-    SUM(conversions_no_cualificado) AS conversions_no_cualificado,
-    SUM(conversions_cualificado_negativo) AS conversions_cualificado_negativo,
-    SUM(conversions_total) AS conversions_total
+    ad_account_name
   FROM ${ref("src_meta_ads_ad_daily")}
   GROUP BY 1, 2, 3, 4, 5, 6
 ),
@@ -169,27 +157,12 @@ joined AS (
     g.keyword_text AS google_keyword_text,
     g.keyword_match_text AS google_keyword_match_text,
     g.keyword_match_type AS google_keyword_match_type,
-    g.impressions AS google_impressions,
-    g.clicks AS google_clicks,
-    g.spend AS google_spend,
     mc.date AS meta_matched_date,
     mc.account_id AS meta_account_id,
     mc.account_name AS meta_account_name,
     mc.ad_account_name AS meta_ad_account_name,
     mc.campaign_id AS meta_campaign_id,
     mc.campaign_name AS meta_campaign_name,
-    mc.impressions AS meta_impressions,
-    mc.clicks AS meta_clicks,
-    mc.link_clicks AS meta_link_clicks,
-    mc.spend AS meta_spend,
-    mc.conversions_cmb AS meta_conversions_cmb,
-    mc.conversions_form AS meta_conversions_form,
-    mc.conversions_cualificado AS meta_conversions_cualificado,
-    mc.conversions_contact AS meta_conversions_contact,
-    mc.conversions_no_gestionado AS meta_conversions_no_gestionado,
-    mc.conversions_no_cualificado AS meta_conversions_no_cualificado,
-    mc.conversions_cualificado_negativo AS meta_conversions_cualificado_negativo,
-    mc.conversions_total AS meta_conversions_total,
     mad.adset_id AS meta_adset_id,
     mad.adset_name AS meta_adset_name,
     mad.ad_id AS meta_ad_id,
@@ -268,13 +241,7 @@ SELECT
     ELSE LOWER(REPLACE(COALESCE(default_channel_grouping, lnd_default_channel_grouping), ' ', '_'))
   END AS channel,
   STRUCT(
-    CASE
-      WHEN google_matched_gclid IS NOT NULL THEN 'google_gclid'
-      WHEN meta_campaign_id IS NOT NULL THEN 'meta_campaign_id'
-      ELSE 'unmatched'
-    END AS attribution_source,
     STRUCT(
-      google_matched_gclid IS NOT NULL AS is_matched,
       google_matched_date AS matched_date,
       google_customer_id AS customer_id,
       google_account_name AS account_name,
@@ -284,13 +251,9 @@ SELECT
       google_ad_group_name AS ad_group_name,
       google_keyword_text AS keyword_text,
       google_keyword_match_text AS keyword_match_text,
-      google_keyword_match_type AS keyword_match_type,
-      COALESCE(google_impressions, 0) AS impressions,
-      COALESCE(google_clicks, 0) AS clicks,
-      COALESCE(google_spend, 0) AS spend
+      google_keyword_match_type AS keyword_match_type
     ) AS google_ads,
     STRUCT(
-      meta_campaign_id IS NOT NULL AS is_matched,
       meta_matched_date AS matched_date,
       meta_account_id AS account_id,
       meta_account_name AS account_name,
@@ -300,19 +263,7 @@ SELECT
       meta_adset_id AS adset_id,
       meta_adset_name AS adset_name,
       meta_ad_id AS ad_id,
-      meta_ad_name AS ad_name,
-      COALESCE(meta_impressions, 0) AS impressions,
-      COALESCE(meta_clicks, 0) AS clicks,
-      COALESCE(meta_link_clicks, 0) AS link_clicks,
-      COALESCE(meta_spend, 0) AS spend,
-      COALESCE(meta_conversions_cmb, 0) AS conversions_cmb,
-      COALESCE(meta_conversions_form, 0) AS conversions_form,
-      COALESCE(meta_conversions_cualificado, 0) AS conversions_cualificado,
-      COALESCE(meta_conversions_contact, 0) AS conversions_contact,
-      COALESCE(meta_conversions_no_gestionado, 0) AS conversions_no_gestionado,
-      COALESCE(meta_conversions_no_cualificado, 0) AS conversions_no_cualificado,
-      COALESCE(meta_conversions_cualificado_negativo, 0) AS conversions_cualificado_negativo,
-      COALESCE(meta_conversions_total, 0) AS conversions_total
+      meta_ad_name AS ad_name
     ) AS meta_ads
   ) AS paid_attribution
 FROM joined
