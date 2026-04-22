@@ -1,8 +1,3 @@
-// Deduplica:  sirve para traducir un gclid de Google Ads a la metadata de Ads que luego necesitas para atribución.
-// tabla puente: gclid -> metadata de click para luego unirlo con sesiones
-
-
-
 config {
   type: "incremental",
   schema: dataform.projectConfig.vars.TRANSFORMATIONS_DATASET,

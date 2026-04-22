@@ -1,9 +1,3 @@
-// Deduplica: Evita repetir en varios modelos la misma lógica de:
-//- ir a ads_Campaign_1534842056
-//- coger la última fila por campaña
-//- sacar nombre y tipo de canal
-// las tablas de entidades de Google Ads transfer funcionan como snapshots repetidos del estado de la entidad
-
 config {
   type: "table",
   schema: dataform.projectConfig.vars.TRANSFORMATIONS_DATASET,

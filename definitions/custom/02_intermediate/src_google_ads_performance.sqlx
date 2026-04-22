@@ -1,7 +1,4 @@
-// transforma el raw de Google Ads en una tabla base diaria de performance ya normalizada y enriquecida, con las
-//  conversiones clasificadas por bucket y preparada para usarse en capas intermedias y reporting.
-
-config {  //se define cómo se materializa la tabla.
+config {
   type: "incremental",
   schema: dataform.projectConfig.vars.TRANSFORMATIONS_DATASET,
   tags: ["marketing", "google_ads"],
@@ -12,7 +9,7 @@ config {  //se define cómo se materializa la tabla.
   }
 }
 
-pre_operations {  //prepara el incremental antes de ejecutar el SELECT.
+pre_operations {
   declare date_checkpoint DATE;
   set date_checkpoint = (
     ${when(incremental(),
@@ -25,7 +22,7 @@ pre_operations {  //prepara el incremental antes de ejecutar el SELECT.
   )}
 }
 
-js {   //importa helpers JS y prepara variables reutilizables.
+js {
   const {
     buildGoogleAdsIncrementalDateCheckpointSql
   } = require("includes/custom/marketing_helpers.js");
@@ -55,7 +52,7 @@ WITH campaign_info AS (
 -- ============================================================================
 -- Basic stats: Ad-level for non-PMax, AdGroup-level for PMax
 -- ============================================================================
-basic_stats AS (                                       //se construye la base de performance diaria con el grain correcto según tipo de campaña.
+basic_stats AS (
   -- Non-PMax campaigns: ad-level granularity
   SELECT
     a.segments_date AS date,
@@ -99,7 +96,7 @@ basic_stats AS (                                       //se construye la base de
 -- ============================================================================
 -- Conversion stats: audited bucket mapping used by the final SELECT
 -- ============================================================================
-conversion_stats AS (                                          // Construye las conversiones bucketizadas
+conversion_stats AS (
   -- Non-PMax: ad-level conversions
   SELECT
     ac.segments_date AS date,
@@ -169,7 +166,7 @@ conversion_stats AS (                                          // Construye las 
 -- ============================================================================
 -- Ad info: ad-level metadata for non-PMax campaigns
 -- ============================================================================
-ad_info AS (                                                   //trae ad_type, strength, final_urls, status
+ad_info AS (
   SELECT
     customer_id,
     ad_group_id,
@@ -200,7 +197,7 @@ ad_info AS (                                                   //trae ad_type, s
 -- ============================================================================
 -- Customer info with country mapping
 -- ============================================================================
-customer_info AS (   // convierte customer_id en nombre de cuenta y país.
+customer_info AS (
   SELECT
     customer_id,
     customer_descriptive_name,
