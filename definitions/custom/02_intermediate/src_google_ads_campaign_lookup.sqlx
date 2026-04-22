@@ -15,7 +15,7 @@ SELECT
   customer_id,
   campaign_id,
   campaign_name,
-  campaign_advertising_channel_type   //sirve para detectar performance_max
+  campaign_advertising_channel_type
 FROM (
   SELECT
     customer_id,
