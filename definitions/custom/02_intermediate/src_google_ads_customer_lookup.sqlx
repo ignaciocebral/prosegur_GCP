@@ -12,6 +12,7 @@ js {
 SELECT
   customer_id,
   customer_descriptive_name,
+  customer_descriptive_name AS account_name,
   ${buildCountryCodeFromNameSql("customer_descriptive_name")} AS country_code
 FROM (
   SELECT

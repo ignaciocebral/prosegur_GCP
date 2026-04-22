@@ -17,6 +17,14 @@ const campaignPerformanceBaseSql = fs.readFileSync(
   path.join(__dirname, "..", "definitions", "custom", "02_intermediate", "int_campaign_performance_daily_base.sqlx"),
   "utf8"
 );
+const customerLookupSql = fs.readFileSync(
+  path.join(__dirname, "..", "definitions", "custom", "02_intermediate", "src_google_ads_customer_lookup.sqlx"),
+  "utf8"
+);
+const clickMappingSql = fs.readFileSync(
+  path.join(__dirname, "..", "definitions", "custom", "02_intermediate", "src_google_ads_click_mapping.sqlx"),
+  "utf8"
+);
 
 assert.strictEqual(parseGoogleAdsCustomerId("0"), 0);
 assert.strictEqual(parseGoogleAdsCustomerId("1703013237"), 1703013237);
@@ -143,6 +151,16 @@ assert.ok(
   campaignPerformanceBaseSql.includes("CAST(NULL AS STRING) AS ad_id") &&
   campaignPerformanceBaseSql.includes("CAST(NULL AS STRING) AS ad_name"),
   "Campaign performance base should drop Google ad-level identifiers before joining GA4 aggregates."
+);
+
+assert.ok(
+  customerLookupSql.includes("customer_descriptive_name AS account_name"),
+  "Google Ads customer lookup should expose account_name for downstream joins that expect the normalized column."
+);
+
+assert.ok(
+  clickMappingSql.includes("acc.account_name"),
+  "Click mapping should continue reading the normalized Google Ads account_name column from the customer lookup."
 );
 
 const duplicatedGoogleAdsRows = [
