@@ -2,6 +2,8 @@
 """
 Description: Google Ads keyword Quality Score mart. One row per keyword+date.
              Tracks QS components alongside performance metrics.
+             sirve para analizar diariamente la calidad de las keywords de Google Ads junto con su rendimiento, para optimizar campañas de
+             search.
 Author: Codex
 Date: 2026-02-17
 Purpose: Production
@@ -35,9 +37,8 @@ pre_operations {
 
 js {
   const {
-    countryCodeFromCustomerNameSQL,
     buildGoogleAdsIncrementalDateCheckpointSql
-  } = require("includes/custom/google_ads_helpers.js");
+  } = require("includes/custom/marketing_helpers.js");
   const googleAdsCustomerIdRaw = dataform.projectConfig.vars.GOOGLE_ADS_CUSTOMER_ID || "0";
 }
 
@@ -88,19 +89,8 @@ customer_info AS (
   SELECT
     customer_id,
     customer_descriptive_name,
-    ${countryCodeFromCustomerNameSQL("customer_descriptive_name")} AS country_code
-  FROM (
-    SELECT
-      customer_id,
-      customer_descriptive_name,
-      ROW_NUMBER() OVER (
-        PARTITION BY customer_id
-        ORDER BY _LATEST_DATE DESC, _DATA_DATE DESC
-      ) AS rn
-    FROM ${ref("ads_Customer_1534842056")}
-    WHERE customer_id = CAST(${dataform.projectConfig.vars.GOOGLE_ADS_CUSTOMER_ID} AS INT64)
-  )
-  WHERE rn = 1
+    country_code
+  FROM ${ref("src_google_ads_customer_lookup")}
 ),
 
 campaign_info AS (
@@ -108,19 +98,7 @@ campaign_info AS (
     customer_id,
     campaign_id,
     campaign_name
-  FROM (
-    SELECT
-      customer_id,
-      campaign_id,
-      campaign_name,
-      ROW_NUMBER() OVER (
-        PARTITION BY customer_id, campaign_id
-        ORDER BY _LATEST_DATE DESC, _DATA_DATE DESC
-      ) AS rn
-    FROM ${ref("ads_Campaign_1534842056")}
-    WHERE customer_id = CAST(${dataform.projectConfig.vars.GOOGLE_ADS_CUSTOMER_ID} AS INT64)
-  )
-  WHERE rn = 1
+  FROM ${ref("src_google_ads_campaign_lookup")}
 ),
 
 ad_group_info AS (

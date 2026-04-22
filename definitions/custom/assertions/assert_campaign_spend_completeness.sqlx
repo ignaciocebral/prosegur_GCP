@@ -2,7 +2,7 @@
 """
 Description: Verifies that total spend in mart_campaign_performance_daily matches source tables.
 Author: Codex
-Date: 2026-02-16
+Date: 2026-04-21
 Purpose: Production
 Retention: Permanent - Quality gate for spend data completeness.
 """
@@ -11,7 +11,7 @@ Retention: Permanent - Quality gate for spend data completeness.
 config {
   type: "assertion",
   tags: [dataform.projectConfig.vars.LABEL_EXECUTION_OPERATION, "quality", "spend"],
-  description: "Asserts that total spend in the campaign performance mart matches the sum of spend in stg_ads_performance (Google) and stg_meta_ads_ad_daily (Meta) within a 1% tolerance."
+  description: "Asserts that total spend in the campaign performance mart matches the sum of spend in src_google_ads_performance (Google) and src_meta_ads_ad_daily (Meta) within a 1% tolerance."
 }
 
 WITH mart_spend AS (
@@ -26,14 +26,14 @@ source_google AS (
   SELECT
     'google_ads' AS platform,
     SUM(cost) AS total_spend
-  FROM ${ref("stg_ads_performance")}
+  FROM ${ref("src_google_ads_performance")}
 ),
 
 source_meta AS (
   SELECT
     'meta_ads' AS platform,
     SUM(spend) AS total_spend
-  FROM ${ref("stg_meta_ads_ad_daily")}
+  FROM ${ref("src_meta_ads_ad_daily")}
 ),
 
 source_spend AS (
@@ -56,7 +56,6 @@ comparison AS (
   FULL OUTER JOIN source_spend s USING (platform)
 )
 
--- Assertion fails if any platform has > 1% spend discrepancy
 SELECT *
 FROM comparison
 WHERE pct_diff > 0.01

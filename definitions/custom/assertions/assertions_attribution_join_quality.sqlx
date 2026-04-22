@@ -35,9 +35,7 @@ WITH mart AS (
     session_id,
     session_date,
     session_gclid,
-    paid_attribution.attribution_source AS attribution_source,
-    COALESCE(paid_attribution.google_ads.is_matched, FALSE) AS google_is_matched,
-    COALESCE(paid_attribution.meta_ads.is_matched, FALSE) AS meta_is_matched
+    matched_platform
   FROM ${ref("mart_session_attribution_enriched")}
   WHERE session_date >= DATE_SUB(CURRENT_DATE(), INTERVAL 120 DAY)
 ),
@@ -47,9 +45,9 @@ daily AS (
     session_date,
     COUNT(DISTINCT session_id) AS sessions_total,
     COUNTIF(session_gclid IS NOT NULL) AS sessions_with_gclid,
-    COUNTIF(google_is_matched) AS sessions_google_matched,
-    COUNTIF(meta_is_matched) AS sessions_meta_matched,
-    COUNTIF(attribution_source = 'unmatched') AS sessions_unmatched
+    COUNTIF(matched_platform = 'google_ads') AS sessions_google_matched,
+    COUNTIF(matched_platform = 'meta_ads') AS sessions_meta_matched,
+    COUNTIF(matched_platform IS NULL) AS sessions_unmatched
   FROM mart
   GROUP BY 1
 ),

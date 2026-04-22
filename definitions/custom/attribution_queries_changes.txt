@@ -29,7 +29,7 @@ Notes:
 Version: v2
 Timestamp: 2026-02-14T12:55:43+01:00
 Scope:
-- Updated `definitions/integrations/google_ads/stg_ads_performance.sqlx`
+- Updated `definitions/custom/02_intermediate/src_google_ads_performance.sqlx`
   - Fixed high-cardinality join explosion by deduplicating dimension sources to one row per business key:
     - `ads_Customer_1534842056` dedup by `customer_id`
     - `ads_Campaign_1534842056` dedup by `customer_id, campaign_id`

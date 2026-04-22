@@ -1,12 +1,22 @@
 const assert = require("assert");
+const fs = require("fs");
+const path = require("path");
 
 const {
   parseGoogleAdsCustomerId,
-  buildGoogleAdsIncrementalDateCheckpointSql
-} = require("../includes/custom/google_ads_helpers.js");
-const {
+  buildGoogleAdsIncrementalDateCheckpointSql,
   buildUnifiedCampaignMartIncrementalDateCheckpointSql
-} = require("../includes/custom/campaign_mart_helpers.js");
+} = require("../includes/custom/marketing_helpers.js");
+const {
+  buildGoogleAdsConversionBucketSql,
+  buildGoogleAdsIgnoredActionSql,
+  GOOGLE_ADS_IGNORED_ACTION_NAMES
+} = require("../includes/custom/marketing_helpers.js");
+
+const campaignPerformanceBaseSql = fs.readFileSync(
+  path.join(__dirname, "..", "definitions", "custom", "02_intermediate", "int_campaign_performance_daily_base.sqlx"),
+  "utf8"
+);
 
 assert.strictEqual(parseGoogleAdsCustomerId("0"), 0);
 assert.strictEqual(parseGoogleAdsCustomerId("1703013237"), 1703013237);
@@ -27,6 +37,22 @@ assert.ok(
 assert.ok(
   checkpointSqlWhenDisabled.includes("THEN DATE('2020-01-01')"),
   "Google incremental checkpoint should force a full rebuild when stale customer rows are detected."
+);
+
+const campaignCheckpointSql = buildUnifiedCampaignMartIncrementalDateCheckpointSql(
+  "`project.dataset.campaign_mart`",
+  "1703013237",
+  "Meta Account 1|Meta Account 2"
+);
+
+assert.ok(
+  campaignCheckpointSql.includes("platform = 'google_ads'"),
+  "Campaign mart checkpoint should evaluate stale Google Ads rows."
+);
+
+assert.ok(
+  campaignCheckpointSql.includes("platform = 'meta_ads'"),
+  "Campaign mart checkpoint should evaluate stale Meta Ads rows."
 );
 
 const duplicatedByKeywordText = [
@@ -60,20 +86,145 @@ assert.ok(
   "The corrected assertion grain by keyword_text + match_type avoids the false positive."
 );
 
-const unifiedMartCheckpointSql = buildUnifiedCampaignMartIncrementalDateCheckpointSql(
-  "`project.dataset.mart_campaign_performance_daily`",
-  "0",
-  "Prosegur Cash Guatemala"
+const bucketSql = buildGoogleAdsConversionBucketSql("action_name");
+const ignoredActionSql = buildGoogleAdsIgnoredActionSql("action_name");
+
+assert.ok(
+  bucketSql.crm.includes("^(Cualificado|Positivo)(_|$)"),
+  "CRM mapping should anchor the Cualificado/Positivo family and avoid false positives like 'No Cualificado'."
 );
 
 assert.ok(
-  unifiedMartCheckpointSql.includes("platform = 'google_ads' AND account_id IS NOT NULL"),
-  "The unified campaign mart checkpoint should only treat persisted Google rows as stale for the Google branch."
+  bucketSql.crm.includes("^Formulario_04($|_)"),
+  "CRM mapping should cover Formulario_04 variants such as _PAY."
 );
 
 assert.ok(
-  unifiedMartCheckpointSql.includes("platform = 'meta_ads' AND (account_name NOT IN ('Prosegur Cash Guatemala'))"),
-  "The unified campaign mart checkpoint should scope Meta stale detection to Meta rows only."
+  bucketSql.form.includes("Lead Submit") &&
+  bucketSql.form.includes("Prosegur Paraguay - GA4 (web) generate_lead"),
+  "Form mapping should include the audited Lead Submit and Paraguay GA4 generate_lead actions."
 );
 
-console.log("google ads incremental + grain regression tests passed");
+assert.ok(
+  bucketSql.call.includes("Prosegur Paraguay - GA4 (web) c2c") &&
+  bucketSql.call.includes("CMB"),
+  "Call mapping should include both callback-style CMB actions and the Paraguay GA4 c2c action."
+);
+
+assert.ok(
+  bucketSql.noGestionado.includes("No Gestionado_formulario") &&
+  !bucketSql.noGestionado.includes("No Cualificado"),
+  "No Gestionado actions should stay isolated from disqualified outcomes."
+);
+
+assert.ok(
+  bucketSql.noCualificado.includes("No Cualificado") &&
+  bucketSql.noCualificado.includes("NoUtil_formulario_02"),
+  "Disqualified Google Ads lead states should map to no_cualificado."
+);
+
+assert.ok(
+  GOOGLE_ADS_IGNORED_ACTION_NAMES.includes("Conversation started"),
+  "Ignored Google Ads actions should keep Conversation started outside the hard buckets."
+);
+
+assert.ok(
+  GOOGLE_ADS_IGNORED_ACTION_NAMES.includes("Purchase"),
+  "Ignored Google Ads actions should keep ecommerce actions out of the lead mapping assertion."
+);
+
+assert.ok(
+  ignoredActionSql.includes("Conversation started") &&
+  ignoredActionSql.includes("Purchase"),
+  "Ignored Google Ads actions should be reusable in SQL to exclude them from downstream conversion totals."
+);
+
+assert.ok(
+  campaignPerformanceBaseSql.includes("CAST(NULL AS STRING) AS ad_id") &&
+  campaignPerformanceBaseSql.includes("CAST(NULL AS STRING) AS ad_name"),
+  "Campaign performance base should drop Google ad-level identifiers before joining GA4 aggregates."
+);
+
+const duplicatedGoogleAdsRows = [
+  {
+    date: "2026-04-21",
+    platform: "google_ads",
+    campaign_id: "cmp-1",
+    ad_group_or_adset_id: "adg-1",
+    ad_id: "ad-1",
+    ad_name: "Variant A",
+    spend: 10
+  },
+  {
+    date: "2026-04-21",
+    platform: "google_ads",
+    campaign_id: "cmp-1",
+    ad_group_or_adset_id: "adg-1",
+    ad_id: "ad-2",
+    ad_name: "Variant B",
+    spend: 15
+  }
+];
+
+const ga4CampaignAggregate = {
+  date: "2026-04-21",
+  platform: "google_ads",
+  campaign_id: "cmp-1",
+  ad_group_or_adset_id: "adg-1",
+  ga4_sessions: 3,
+  ga4_conversions_form: 1
+};
+
+const duplicatedLegacyJoin = duplicatedGoogleAdsRows.map(row => ({
+  ...row,
+  ga4_sessions: ga4CampaignAggregate.ga4_sessions,
+  ga4_conversions_form: ga4CampaignAggregate.ga4_conversions_form
+}));
+
+assert.strictEqual(
+  duplicatedLegacyJoin.reduce((total, row) => total + row.ga4_sessions, 0),
+  6,
+  "Keeping Google rows below ad-group grain duplicates one GA4 campaign aggregate across ads."
+);
+
+const aggregatedGoogleRows = [...duplicatedGoogleAdsRows.reduce((groups, row) => {
+  const key = [row.date, row.platform, row.campaign_id, row.ad_group_or_adset_id].join("|");
+  const current = groups.get(key) || {
+    date: row.date,
+    platform: row.platform,
+    campaign_id: row.campaign_id,
+    ad_group_or_adset_id: row.ad_group_or_adset_id,
+    ad_id: null,
+    ad_name: null,
+    spend: 0
+  };
+  current.spend += row.spend;
+  groups.set(key, current);
+  return groups;
+}, new Map()).values()];
+
+const correctedJoin = aggregatedGoogleRows.map(row => ({
+  ...row,
+  ga4_sessions: ga4CampaignAggregate.ga4_sessions,
+  ga4_conversions_form: ga4CampaignAggregate.ga4_conversions_form
+}));
+
+assert.strictEqual(
+  correctedJoin.length,
+  1,
+  "Aggregating Google rows to ad-group grain should collapse duplicate ads before the GA4 join."
+);
+
+assert.strictEqual(
+  correctedJoin[0].ga4_sessions,
+  3,
+  "After the grain fix, the GA4 session aggregate should be attached only once."
+);
+
+assert.strictEqual(
+  correctedJoin[0].ad_id,
+  null,
+  "After aggregation, Google rows should not retain ad_id in the joined output grain."
+);
+
+console.log("marketing helpers google ads regression tests passed");
