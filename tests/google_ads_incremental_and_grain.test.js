@@ -120,6 +120,12 @@ assert.ok(
 );
 
 assert.ok(
+  bucketSql.call.includes("Clics en el n\u00famero de tel\u00e9fono en tu sitio web m\u00f3vi (C2C)") &&
+  bucketSql.call.includes("Llamadas a tel\u00e9fono en sitio web (desv\u00edo de llamada)"),
+  "Call mapping should include the accented Spain action-name variants surfaced by the coverage assertion."
+);
+
+assert.ok(
   bucketSql.noGestionado.includes("No Gestionado_formulario") &&
   !bucketSql.noGestionado.includes("No Cualificado"),
   "No Gestionado actions should stay isolated from disqualified outcomes."
@@ -142,8 +148,14 @@ assert.ok(
 );
 
 assert.ok(
+  GOOGLE_ADS_IGNORED_ACTION_NAMES.includes("Inicio de la tramitaci\u00f3n de la compra"),
+  "Ignored Google Ads actions should include the accented purchase-start variant surfaced by crypto."
+);
+
+assert.ok(
   ignoredActionSql.includes("Conversation started") &&
-  ignoredActionSql.includes("Purchase"),
+  ignoredActionSql.includes("Purchase") &&
+  ignoredActionSql.includes("Inicio de la tramitaci\u00f3n de la compra"),
   "Ignored Google Ads actions should be reusable in SQL to exclude them from downstream conversion totals."
 );
 

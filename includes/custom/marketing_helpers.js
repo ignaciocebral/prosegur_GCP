@@ -71,7 +71,9 @@ const GOOGLE_ADS_CALL_ACTION_NAMES = [
   "C2C",
   "Llamadas desde anuncios (GAds)",
   "Llamadas a telefono en sitio web (desvio de llamada)",
+  "Llamadas a tel\u00e9fono en sitio web (desv\u00edo de llamada)",
   "Clics en el numero de telefono en tu sitio web movi (C2C)",
+  "Clics en el n\u00famero de tel\u00e9fono en tu sitio web m\u00f3vi (C2C)",
   "Prosegur Paraguay - GA4 (web) c2c"
 ];
 
@@ -89,7 +91,8 @@ const GOOGLE_ADS_IGNORED_ACTION_NAMES = [
   "Compra",
   "Purchase",
   "Checkout",
-  "Inicio de la tramitacion de la compra"
+  "Inicio de la tramitacion de la compra",
+  "Inicio de la tramitaci\u00f3n de la compra"
 ];
 
 const GOOGLE_ADS_CONVERSION_AUDIT = [
@@ -106,7 +109,7 @@ const GOOGLE_ADS_CONVERSION_AUDIT = [
     reason: "Validated as form or lead-submit style actions in Google Ads API and GTM."
   },
   {
-    action_name: "CMB, C2C, Llamadas desde anuncios (GAds), Llamadas a telefono en sitio web (desvio de llamada), Clics en el numero de telefono en tu sitio web movi (C2C), Prosegur Paraguay - GA4 (web) c2c",
+    action_name: "CMB, C2C, Llamadas desde anuncios (GAds), Llamadas a telefono en sitio web (desvio de llamada), Llamadas a tel\u00e9fono en sitio web (desv\u00edo de llamada), Clics en el numero de telefono en tu sitio web movi (C2C), Clics en el n\u00famero de tel\u00e9fono en tu sitio web m\u00f3vi (C2C), Prosegur Paraguay - GA4 (web) c2c",
     recommended_bucket: "call",
     scope: "AR, BR, CL, CO, CRI, ECU, ES, PE, PT, PY, DE",
     reason: "These actions are used operationally as call or contact buckets in the ETL."
@@ -136,7 +139,7 @@ const GOOGLE_ADS_CONVERSION_AUDIT = [
     reason: "Validated as visit or page-view style actions."
   },
   {
-    action_name: "Conversation started, Compra, Purchase, Checkout, Inicio de la tramitacion de la compra",
+    action_name: "Conversation started, Compra, Purchase, Checkout, Inicio de la tramitacion de la compra, Inicio de la tramitaci\u00f3n de la compra",
     recommended_bucket: "ignored",
     scope: "BR, PE historical data, Digital Gold, Change AU",
     reason: "These actions should be ignored in the lead model and excluded from coverage checks."
