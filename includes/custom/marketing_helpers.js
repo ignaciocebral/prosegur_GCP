@@ -264,6 +264,8 @@ const META_ADS_CRM_CONVERSION_NAMES = [
 ];
 
 const META_ADS_CONTACT_CONVERSION_NAMES = [
+  "contact_total",
+  "contact_website",
   "offsite_conversion.fb_pixel_custom.c2c",
   "offsite_conversion.fb_pixel_custom.click to call",
   "offsite_conversion.fb_pixel_custom.click_to_whatsapp"

@@ -58,6 +58,16 @@ assert.ok(
 const metaBuckets = buildMetaAdsConversionBucketSql("c.name");
 
 assert.ok(
+  metaBuckets.contact.includes("contact_total"),
+  "Meta contact bucket should include Paraguay contact_total events."
+);
+
+assert.ok(
+  metaBuckets.contact.includes("contact_website"),
+  "Meta contact bucket should include Paraguay contact_website events."
+);
+
+assert.ok(
   metaBuckets.contact.includes("offsite_conversion.fb_pixel_custom.c2c"),
   "Meta contact bucket should include c2c events."
 );

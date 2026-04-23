@@ -12,7 +12,7 @@ File: `definitions/custom/02_intermediate/src_meta_ads_ad_daily.sqlx`
 - `conversions_cmb`: any conversion name matching `%cmb%`
 - `conversions_form`: only `Form`, `form`, `Formulario Contacto`
 - `conversions_cualificado`: only `Cualificado`
-- `conversions_contact`: only `contact_total`
+- `conversions_contact`: `contact_total`, `contact_website`, `offsite_conversion.fb_pixel_custom.c2c`, `offsite_conversion.fb_pixel_custom.click to call`, `offsite_conversion.fb_pixel_custom.click_to_whatsapp`
 - `conversions_no_gestionado`: only `No Gestionado`
 - `conversions_no_cualificado`: `No Cualificado`, `Cuelga`, `Telefono Erroneo`, `Registro Error`
 - `conversions_cualificado_negativo`: `Cualificado Negativo`, `Baja Recaudacion`
