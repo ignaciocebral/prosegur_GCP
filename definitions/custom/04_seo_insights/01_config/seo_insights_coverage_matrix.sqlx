@@ -1,0 +1,12 @@
+config {
+  type: "view",
+  schema: dataform.projectConfig.vars.OUTPUTS_DATASET,
+  tags: [dataform.projectConfig.vars.LABEL_EXECUTION_OPERATION, "seo_insights", "coverage", "config"],
+  description: "Coverage matrix for SEO Insights March 2026 by business line, country and KPI."
+}
+
+js {
+  const seoInsights = require("includes/custom/seo_insights_config");
+}
+
+${seoInsights.buildCoverageMatrixSql()}

@@ -1,0 +1,133 @@
+config {
+  type: "incremental",
+  schema: dataform.projectConfig.vars.OUTPUTS_DATASET,
+  tags: [dataform.projectConfig.vars.LABEL_EXECUTION_OPERATION, "seo_insights", "export", "monthly"],
+  description: "Normalized monthly export for the Making Science SEO Insights workbook.",
+  bigquery: {
+    partitionBy: "month",
+    clusterBy: ["market", "kpi"]
+  }
+}
+
+js {
+  const seoInsights = require("includes/custom/seo_insights_config");
+}
+
+pre_operations {
+  declare date_checkpoint DATE;
+  set date_checkpoint = (
+    ${when(incremental(),
+      `SELECT COALESCE(DATE_SUB(MAX(month), INTERVAL 2 MONTH), DATE(${seoInsights.TEMPLATE_YEAR}, 1, 1)) FROM ${self()}`,
+      `SELECT DATE(${seoInsights.TEMPLATE_YEAR}, 1, 1)`
+    )}
+  );
+  ${when(incremental(),
+    `DELETE FROM ${self()} WHERE month >= date_checkpoint`
+  )}
+}
+
+WITH coverage AS (
+  SELECT *
+  FROM ${ref("seo_insights_coverage_matrix")}
+  WHERE export_to_master
+),
+
+months AS (
+  SELECT month_start
+  FROM UNNEST(
+    GENERATE_DATE_ARRAY(
+      GREATEST(DATE(${seoInsights.TEMPLATE_YEAR}, 1, 1), date_checkpoint),
+      DATE(${seoInsights.TEMPLATE_YEAR}, 12, 1),
+      INTERVAL 1 MONTH
+    )
+  ) AS month_start
+),
+
+grid AS (
+  SELECT
+    months.month_start,
+    coverage.filters_version,
+    coverage.business_line,
+    coverage.country_code,
+    coverage.market,
+    coverage.kpi,
+    coverage.availability_status,
+    coverage.notes AS coverage_notes
+  FROM months
+  CROSS JOIN coverage
+),
+
+semantic AS (
+  SELECT * FROM ${ref("seo_insights_semantic_monthly")}
+  WHERE month_start >= DATE_SUB(date_checkpoint, INTERVAL 1 YEAR)
+),
+
+current_year AS (
+  SELECT
+    month_start,
+    market,
+    kpi,
+    SUM(metric_value) AS value_2026,
+    STRING_AGG(DISTINCT source_system, ', ' ORDER BY source_system) AS source_system_2026,
+    STRING_AGG(DISTINCT source_detail, ' | ' ORDER BY source_detail) AS source_detail_2026
+  FROM semantic
+  WHERE EXTRACT(YEAR FROM month_start) = ${seoInsights.TEMPLATE_YEAR}
+    AND month_start >= GREATEST(DATE(${seoInsights.TEMPLATE_YEAR}, 1, 1), date_checkpoint)
+  GROUP BY 1, 2, 3
+),
+
+previous_year AS (
+  SELECT
+    DATE_ADD(month_start, INTERVAL 1 YEAR) AS month_start,
+    market,
+    kpi,
+    SUM(metric_value) AS value_2025,
+    STRING_AGG(DISTINCT source_system, ', ' ORDER BY source_system) AS source_system_2025,
+    STRING_AGG(DISTINCT source_detail, ' | ' ORDER BY source_detail) AS source_detail_2025
+  FROM semantic
+  WHERE EXTRACT(YEAR FROM month_start) = ${seoInsights.COMPARISON_YEAR}
+    AND DATE_ADD(month_start, INTERVAL 1 YEAR) >= GREATEST(DATE(${seoInsights.TEMPLATE_YEAR}, 1, 1), date_checkpoint)
+  GROUP BY 1, 2, 3
+),
+
+filter_specs AS (
+  SELECT
+    market,
+    dashboard_name,
+    filter_validation_status,
+    delivery_medium,
+    validation_notes
+  FROM ${ref("seo_insights_looker_filter_specs")}
+)
+
+SELECT
+  grid.month_start AS month,
+  grid.market,
+  grid.kpi,
+  current_year.value_2026,
+  previous_year.value_2025,
+  COALESCE(current_year.source_system_2026, previous_year.source_system_2025) AS source_system,
+  COALESCE(current_year.source_detail_2026, previous_year.source_detail_2025) AS source_detail,
+  grid.filters_version,
+  filter_specs.dashboard_name,
+  filter_specs.filter_validation_status,
+  filter_specs.delivery_medium,
+  CASE
+    WHEN grid.availability_status = 'not_available' THEN 'gap_not_supported'
+    WHEN current_year.value_2026 IS NULL AND previous_year.value_2025 IS NULL THEN 'no_data_found'
+    WHEN filter_specs.filter_validation_status = 'pending_looker_validation' THEN 'data_present_pending_looker_validation'
+    ELSE 'ready_for_excel'
+  END AS delivery_status,
+  grid.availability_status,
+  COALESCE(filter_specs.validation_notes, grid.coverage_notes) AS notes
+FROM grid
+LEFT JOIN current_year
+  ON grid.month_start = current_year.month_start
+  AND grid.market = current_year.market
+  AND grid.kpi = current_year.kpi
+LEFT JOIN previous_year
+  ON grid.month_start = previous_year.month_start
+  AND grid.market = previous_year.market
+  AND grid.kpi = previous_year.kpi
+LEFT JOIN filter_specs
+  ON grid.market = filter_specs.market
