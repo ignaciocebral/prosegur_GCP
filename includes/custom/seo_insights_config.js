@@ -1,5 +1,5 @@
 const PROJECT_ID = "pga-data-b2b-marketing-dev";
-const FILTERS_VERSION = "seo_insights_filters_2026_04_23";
+const FILTERS_VERSION = "seo_insights_filters_2026_04_23_daily_gsc";
 const TEMPLATE_YEAR = 2026;
 const COMPARISON_YEAR = 2025;
 const SOURCE_START_DATE = "2025-01-01";
@@ -18,8 +18,34 @@ const KPI_LABELS = {
   leads: "Leads",
   qualified_leads: "Leads cualificados",
   sales: "Ventas",
-  revenue: "Facturación"
+  revenue: "Facturación",
+  gsc_impressions: "Impresiones SERP",
+  gsc_clicks: "Clicks SERP",
+  gsc_sum_position: "Suma posiciones SERP"
 };
+
+const KPI_KEYS = [
+  "sessions",
+  "leads",
+  "qualified_leads",
+  "sales",
+  "revenue",
+  "gsc_impressions",
+  "gsc_clicks",
+  "gsc_sum_position"
+];
+
+const GSC_KPI_KEYS = ["gsc_impressions", "gsc_clicks", "gsc_sum_position"];
+
+const GSC_DEFAULT_SEARCH_TYPE = "WEB";
+
+function gscDatasetForMarket(market) {
+  return `searchconsole_${market.countryCode.toLowerCase()}`;
+}
+
+function hasGscUrlScope(market) {
+  return Boolean(market.gscUrlIncludeRegex);
+}
 
 const GA4_MARKETS = [
   {
@@ -709,10 +735,21 @@ function kpiAvailability(market, kpiKey) {
     return isCash || isSecurityEs ? "available" : "not_available";
   }
 
+  if (GSC_KPI_KEYS.includes(kpiKey)) {
+    return hasGscUrlScope(market) ? "available" : "partial";
+  }
+
   return "not_available";
 }
 
 function coverageNotes(market, kpiKey) {
+  if (GSC_KPI_KEYS.includes(kpiKey)) {
+    if (hasGscUrlScope(market)) {
+      return `Search Console scoped via gscUrlIncludeRegex on ${gscDatasetForMarket(market)}.`;
+    }
+    return `Search Console rolled up at country level (${gscDatasetForMarket(market)}). Same value across markets sharing this country until gscUrlIncludeRegex is provided.`;
+  }
+
   if (["talent", "avos"].includes(market.businessLine) && !market.includeInMasterExport) {
     if (kpiKey === "sessions" || kpiKey === "leads") {
       return "Implemented for the semantic layer only. Excluded from the current master workbook.";
@@ -747,6 +784,9 @@ function coverageSourceSystem(market, kpiKey) {
   if (kpiKey === "qualified_leads") {
     return market.businessLine === "security" ? "cc_gold.cc_leads_security" : "cc_gold.cc_leads_master";
   }
+  if (GSC_KPI_KEYS.includes(kpiKey)) {
+    return `${gscDatasetForMarket(market)}.searchdata_url_impression`;
+  }
   const salesSource = findSalesSource(market.market);
   if (salesSource) {
     return salesSource.sourceSystem;
@@ -757,7 +797,7 @@ function coverageSourceSystem(market, kpiKey) {
 function buildCoverageMatrixSql() {
   const rows = [];
   for (const market of GA4_MARKETS) {
-    for (const kpiKey of ["sessions", "leads", "qualified_leads", "sales", "revenue"]) {
+    for (const kpiKey of KPI_KEYS) {
       rows.push(
         [
           `SELECT ${sqlString(FILTERS_VERSION)} AS filters_version`,
@@ -819,14 +859,19 @@ function buildFilterSpecsSql() {
           hasQualifiedLeads(market)
             ? (market.businessLine === "security" ? "cc_gold.cc_leads_security" : "cc_gold.cc_leads_master")
             : null,
-          salesSource ? salesSource.sourceSystem : null
+          salesSource ? salesSource.sourceSystem : null,
+          `${gscDatasetForMarket(market)}.searchdata_url_impression`
         ].filter(Boolean)
       )} AS source_systems`,
       `${sqlString(market.filterValidationStatus)} AS filter_validation_status`,
       `${sqlString(market.validationNotes)} AS validation_notes`,
       `${sqlString(market.businessNotes)} AS business_notes`,
       `${sqlString(DELIVERY_MEDIUM)} AS delivery_medium`,
-      `${sqlBool(market.includeInMasterExport)} AS export_to_master`
+      `${sqlBool(market.includeInMasterExport)} AS export_to_master`,
+      `${sqlString(gscDatasetForMarket(market))} AS gsc_dataset`,
+      `${sqlString(market.gscUrlIncludeRegex || null)} AS gsc_url_include_regex`,
+      `${sqlString(market.gscUrlExcludeRegex || null)} AS gsc_url_exclude_regex`,
+      `${sqlString(hasGscUrlScope(market) ? "market_scope" : "country_aggregate")} AS gsc_scope_status`
     ].join(", ");
   });
 
@@ -896,7 +941,7 @@ function leadConversionCondition(alias) {
   ].join(" OR ");
 }
 
-function buildGa4MonthlySql(options = {}) {
+function buildGa4DailySql(options = {}) {
   const dateLowerBoundExpression = resolveDateLowerBoundExpression(options.dateLowerBoundExpression);
   const parts = [];
 
@@ -921,7 +966,7 @@ SELECT * FROM (
       AND ${ga4BusinessFilter("e", market)}
   )
   SELECT
-    DATE_TRUNC(s.session_date, MONTH) AS month_start,
+    s.session_date AS activity_date,
     ${baseSelect},
     ${sqlString(KPI_LABELS.sessions)} AS kpi,
     COUNT(DISTINCT s.session_id) AS metric_value,
@@ -937,7 +982,7 @@ SELECT * FROM (
     parts.push(`
 SELECT * FROM (
   SELECT
-    DATE_TRUNC(e.event_date, MONTH) AS month_start,
+    e.event_date AS activity_date,
     ${baseSelect},
     ${sqlString(KPI_LABELS.leads)} AS kpi,
     COUNTIF(${leadConversionCondition("e")}) AS metric_value,
@@ -956,7 +1001,7 @@ SELECT * FROM (
   return parts.join("\nUNION ALL\n");
 }
 
-function buildCcMonthlySql(options = {}) {
+function buildCcDailySql(options = {}) {
   const dateLowerBoundExpression = resolveDateLowerBoundExpression(options.dateLowerBoundExpression);
   const parts = [];
 
@@ -974,7 +1019,7 @@ function buildCcMonthlySql(options = {}) {
 
     parts.push(`
 SELECT
-  DATE_TRUNC(management_end_date, MONTH) AS month_start,
+  management_end_date AS activity_date,
   ${sqlString(FILTERS_VERSION)} AS filters_version,
   ${sqlString(market.businessLine)} AS business_line,
   ${sqlString(market.countryCode)} AS country_code,
@@ -1000,7 +1045,7 @@ GROUP BY 1, 2, 3, 4, 5, 6, 7, 8
   if (parts.length === 0) {
     return `
 SELECT
-  DATE('${SOURCE_START_DATE}') AS month_start,
+  DATE('${SOURCE_START_DATE}') AS activity_date,
   ${sqlString(FILTERS_VERSION)} AS filters_version,
   'none' AS business_line,
   'XX' AS country_code,
@@ -1018,12 +1063,11 @@ WHERE FALSE
   return parts.join("\nUNION ALL\n");
 }
 
-function buildSalesMonthlySql(options = {}) {
+function buildSalesDailySql(options = {}) {
   const dateLowerBoundExpression = resolveDateLowerBoundExpression(options.dateLowerBoundExpression);
   const parts = [];
 
   for (const source of SALES_SOURCE_CONFIGS) {
-    const market = GA4_MARKETS.find((item) => item.market === source.market);
     const commonColumns = [
       `${sqlString(FILTERS_VERSION)} AS filters_version`,
       `${sqlString(source.businessLine)} AS business_line`,
@@ -1036,7 +1080,7 @@ function buildSalesMonthlySql(options = {}) {
 
     parts.push(`
 SELECT
-  DATE_TRUNC(${source.dateExpression}, MONTH) AS month_start,
+  ${source.dateExpression} AS activity_date,
   ${commonColumns},
   ${sqlString(KPI_LABELS.sales)} AS kpi,
   ${source.salesExpression} AS metric_value,
@@ -1049,7 +1093,7 @@ GROUP BY 1, 2, 3, 4, 5, 6, 7, 8
 
     parts.push(`
 SELECT
-  DATE_TRUNC(${source.dateExpression}, MONTH) AS month_start,
+  ${source.dateExpression} AS activity_date,
   ${commonColumns},
   ${sqlString(KPI_LABELS.revenue)} AS kpi,
   ${source.revenueExpression} AS metric_value,
@@ -1064,7 +1108,7 @@ GROUP BY 1, 2, 3, 4, 5, 6, 7, 8
   if (parts.length === 0) {
     return `
 SELECT
-  DATE('${SOURCE_START_DATE}') AS month_start,
+  DATE('${SOURCE_START_DATE}') AS activity_date,
   ${sqlString(FILTERS_VERSION)} AS filters_version,
   'none' AS business_line,
   'XX' AS country_code,
@@ -1082,15 +1126,105 @@ WHERE FALSE
   return parts.join("\nUNION ALL\n");
 }
 
+function buildGscDailySql(options = {}) {
+  const dateLowerBoundExpression = resolveDateLowerBoundExpression(options.dateLowerBoundExpression);
+  const parts = [];
+
+  for (const market of GA4_MARKETS) {
+    const dataset = gscDatasetForMarket(market);
+    const sourceSystem = `${dataset}.searchdata_url_impression`;
+    const hasUrlScope = hasGscUrlScope(market);
+
+    const filterClauses = [
+      `data_date >= ${dateLowerBoundExpression}`,
+      `search_type = ${sqlString(GSC_DEFAULT_SEARCH_TYPE)}`
+    ];
+    if (market.gscSiteUrlInclude && market.gscSiteUrlInclude.length > 0) {
+      filterClauses.push(
+        `LOWER(TRIM(COALESCE(site_url, ''))) IN (${market.gscSiteUrlInclude
+          .map((value) => sqlString(value.toLowerCase()))
+          .join(", ")})`
+      );
+    }
+    if (market.gscUrlIncludeRegex) {
+      filterClauses.push(
+        `REGEXP_CONTAINS(LOWER(COALESCE(url, '')), ${sqlString(market.gscUrlIncludeRegex)})`
+      );
+    }
+    if (market.gscUrlExcludeRegex) {
+      filterClauses.push(
+        `NOT REGEXP_CONTAINS(LOWER(COALESCE(url, '')), ${sqlString(market.gscUrlExcludeRegex)})`
+      );
+    }
+
+    const validationStatus = hasUrlScope ? "pending_looker_validation" : "country_aggregate_pending_url_scope";
+    const notes = hasUrlScope
+      ? `Search Console scoped to ${dataset} with market-level URL regex. Awaiting Looker confirmation.`
+      : `Search Console rolled up at country level (${dataset}). Same value across markets sharing this country until gscUrlIncludeRegex is provided.`;
+
+    const commonColumns = [
+      `${sqlString(FILTERS_VERSION)} AS filters_version`,
+      `${sqlString(market.businessLine)} AS business_line`,
+      `${sqlString(market.countryCode)} AS country_code`,
+      `${sqlString(market.market)} AS market`,
+      `${sqlString(sourceSystem)} AS source_system`,
+      `${sqlString(validationStatus)} AS filter_validation_status`,
+      `${sqlString(notes)} AS notes`
+    ].join(",\n  ");
+
+    const whereClause = filterClauses.join("\n  AND ");
+    const sourceDetail = `Search Console ${GSC_DEFAULT_SEARCH_TYPE} traffic from ${sourceSystem}${hasUrlScope ? " with market URL scope" : " (country aggregate)"}.`;
+
+    parts.push(`
+SELECT
+  data_date AS activity_date,
+  ${commonColumns},
+  ${sqlString(KPI_LABELS.gsc_impressions)} AS kpi,
+  SUM(COALESCE(impressions, 0)) AS metric_value,
+  ${sqlString(sourceDetail)} AS source_detail
+FROM \`${PROJECT_ID}.${sourceSystem}\`
+WHERE ${whereClause}
+GROUP BY 1, 2, 3, 4, 5, 6, 7, 8
+`);
+
+    parts.push(`
+SELECT
+  data_date AS activity_date,
+  ${commonColumns},
+  ${sqlString(KPI_LABELS.gsc_clicks)} AS kpi,
+  SUM(COALESCE(clicks, 0)) AS metric_value,
+  ${sqlString(sourceDetail)} AS source_detail
+FROM \`${PROJECT_ID}.${sourceSystem}\`
+WHERE ${whereClause}
+GROUP BY 1, 2, 3, 4, 5, 6, 7, 8
+`);
+
+    parts.push(`
+SELECT
+  data_date AS activity_date,
+  ${commonColumns},
+  ${sqlString(KPI_LABELS.gsc_sum_position)} AS kpi,
+  SUM(COALESCE(sum_position, 0)) AS metric_value,
+  ${sqlString(sourceDetail + " Avg position downstream = sum_position / impressions + 1.")} AS source_detail
+FROM \`${PROJECT_ID}.${sourceSystem}\`
+WHERE ${whereClause}
+GROUP BY 1, 2, 3, 4, 5, 6, 7, 8
+`);
+  }
+
+  return parts.join("\nUNION ALL\n");
+}
+
 module.exports = {
   COMPARISON_YEAR,
   DELIVERY_MEDIUM,
   FILTERS_VERSION,
   SOURCE_START_DATE,
   TEMPLATE_YEAR,
-  buildCcMonthlySql,
+  buildCcDailySql,
   buildCoverageMatrixSql,
   buildFilterSpecsSql,
-  buildGa4MonthlySql,
-  buildSalesMonthlySql
+  buildGa4DailySql,
+  buildGscDailySql,
+  buildSalesDailySql
 };

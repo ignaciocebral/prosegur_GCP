@@ -2,7 +2,7 @@ config {
   type: "incremental",
   schema: dataform.projectConfig.vars.OUTPUTS_DATASET,
   tags: [dataform.projectConfig.vars.LABEL_EXECUTION_OPERATION, "seo_insights", "export", "monthly"],
-  description: "Normalized monthly export for the Making Science SEO Insights workbook.",
+  description: "Normalized monthly export for the Making Science SEO Insights workbook. Reaggregates seo_insights_semantic_daily to month grain.",
   bigquery: {
     partitionBy: "month",
     clusterBy: ["market", "kpi"]
@@ -57,9 +57,18 @@ grid AS (
   CROSS JOIN coverage
 ),
 
-semantic AS (
-  SELECT * FROM ${ref("seo_insights_semantic_monthly")}
-  WHERE month_start >= DATE_SUB(date_checkpoint, INTERVAL 1 YEAR)
+semantic_monthly AS (
+  SELECT
+    DATE_TRUNC(activity_date, MONTH) AS month_start,
+    market,
+    kpi,
+    EXTRACT(YEAR FROM activity_date) AS year,
+    SUM(metric_value) AS metric_value,
+    STRING_AGG(DISTINCT source_system, ', ' ORDER BY source_system) AS source_system,
+    STRING_AGG(DISTINCT source_detail, ' | ' ORDER BY source_detail) AS source_detail
+  FROM ${ref("seo_insights_semantic_daily")}
+  WHERE activity_date >= DATE_SUB(date_checkpoint, INTERVAL 1 YEAR)
+  GROUP BY 1, 2, 3, 4
 ),
 
 current_year AS (
@@ -67,13 +76,12 @@ current_year AS (
     month_start,
     market,
     kpi,
-    SUM(metric_value) AS value_2026,
-    STRING_AGG(DISTINCT source_system, ', ' ORDER BY source_system) AS source_system_2026,
-    STRING_AGG(DISTINCT source_detail, ' | ' ORDER BY source_detail) AS source_detail_2026
-  FROM semantic
-  WHERE EXTRACT(YEAR FROM month_start) = ${seoInsights.TEMPLATE_YEAR}
+    metric_value AS value_2026,
+    source_system AS source_system_2026,
+    source_detail AS source_detail_2026
+  FROM semantic_monthly
+  WHERE year = ${seoInsights.TEMPLATE_YEAR}
     AND month_start >= GREATEST(DATE(${seoInsights.TEMPLATE_YEAR}, 1, 1), date_checkpoint)
-  GROUP BY 1, 2, 3
 ),
 
 previous_year AS (
@@ -81,13 +89,12 @@ previous_year AS (
     DATE_ADD(month_start, INTERVAL 1 YEAR) AS month_start,
     market,
     kpi,
-    SUM(metric_value) AS value_2025,
-    STRING_AGG(DISTINCT source_system, ', ' ORDER BY source_system) AS source_system_2025,
-    STRING_AGG(DISTINCT source_detail, ' | ' ORDER BY source_detail) AS source_detail_2025
-  FROM semantic
-  WHERE EXTRACT(YEAR FROM month_start) = ${seoInsights.COMPARISON_YEAR}
+    metric_value AS value_2025,
+    source_system AS source_system_2025,
+    source_detail AS source_detail_2025
+  FROM semantic_monthly
+  WHERE year = ${seoInsights.COMPARISON_YEAR}
     AND DATE_ADD(month_start, INTERVAL 1 YEAR) >= GREATEST(DATE(${seoInsights.TEMPLATE_YEAR}, 1, 1), date_checkpoint)
-  GROUP BY 1, 2, 3
 ),
 
 filter_specs AS (

@@ -1,10 +1,10 @@
 config {
   type: "incremental",
   schema: dataform.projectConfig.vars.OUTPUTS_DATASET,
-  tags: [dataform.projectConfig.vars.LABEL_EXECUTION_OPERATION, "seo_insights", "semantic", "monthly"],
-  description: "Semantic monthly layer for SEO Insights with KPI values and configuration metadata.",
+  tags: [dataform.projectConfig.vars.LABEL_EXECUTION_OPERATION, "seo_insights", "semantic", "daily"],
+  description: "Semantic daily layer for SEO Insights with KPI values and configuration metadata.",
   bigquery: {
-    partitionBy: "month_start",
+    partitionBy: "activity_date",
     clusterBy: ["market", "kpi"]
   }
 }
@@ -13,25 +13,27 @@ pre_operations {
   declare date_checkpoint DATE;
   set date_checkpoint = (
     ${when(incremental(),
-      `SELECT COALESCE(DATE_SUB(MAX(month_start), INTERVAL 2 MONTH), DATE('2025-01-01')) FROM ${self()}`,
+      `SELECT COALESCE(DATE_SUB(MAX(activity_date), INTERVAL 7 DAY), DATE('2025-01-01')) FROM ${self()}`,
       `SELECT DATE('2025-01-01')`
     )}
   );
   ${when(incremental(),
-    `DELETE FROM ${self()} WHERE month_start >= date_checkpoint`
+    `DELETE FROM ${self()} WHERE activity_date >= date_checkpoint`
   )}
 }
 
 WITH metric_sources AS (
-  SELECT * FROM ${ref("seo_insights_ga4_monthly")} WHERE month_start >= date_checkpoint
+  SELECT * FROM ${ref("seo_insights_ga4_daily")} WHERE activity_date >= date_checkpoint
   UNION ALL
-  SELECT * FROM ${ref("seo_insights_cc_monthly")} WHERE month_start >= date_checkpoint
+  SELECT * FROM ${ref("seo_insights_cc_daily")} WHERE activity_date >= date_checkpoint
   UNION ALL
-  SELECT * FROM ${ref("seo_insights_sales_monthly")} WHERE month_start >= date_checkpoint
+  SELECT * FROM ${ref("seo_insights_sales_daily")} WHERE activity_date >= date_checkpoint
+  UNION ALL
+  SELECT * FROM ${ref("seo_insights_gsc_daily")} WHERE activity_date >= date_checkpoint
 )
 
 SELECT
-  metric_sources.month_start,
+  metric_sources.activity_date,
   metric_sources.filters_version,
   coverage.business_line,
   coverage.country_code,
