@@ -1,6 +1,0 @@
-config {
-  type: "view",
-  disabled: true
-}
-
-SELECT 1 AS deprecated_model
