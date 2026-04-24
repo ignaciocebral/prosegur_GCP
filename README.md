@@ -252,6 +252,10 @@ The source mapping dimension has 23 market rows. GA4, Google Ads, and Search Con
 
 Use a dedicated read-only service account for consumption.
 
+Current service account:
+
+- `alberto-seo-mart@spring-line-421422.iam.gserviceaccount.com`
+
 Minimum practical IAM:
 
 - `roles/bigquery.jobUser` on `spring-line-421422`
@@ -263,6 +267,19 @@ Guardrails:
 - no Dataform admin permissions
 - no permission to alter release configs
 - prefer table-level grants if a dataset contains unrelated marts
+
+Current scope:
+
+- Project-level role: `roles/bigquery.jobUser`
+- Table/view-level role: `roles/bigquery.dataViewer`
+- Granted only on the consumer-facing SEO Insights objects in the 10 SEO output datasets:
+  - `dim_seo_insights_source_mapping`
+  - `seo_insights_looker_filter_specs`
+  - `seo_insights_coverage_matrix`
+  - `seo_insights_semantic_daily`
+  - `seo_insights_monthly_raw_export`
+
+No service account key is stored in this repo. If Alberto needs to run queries directly, prefer granting his Google identity permission to impersonate this service account instead of creating a long-lived JSON key.
 
 ## Files to Read First
 
