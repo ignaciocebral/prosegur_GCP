@@ -168,8 +168,8 @@ joined AS (
       WHEN mc.campaign_id IS NULL THEN NULL
       WHEN b.landing_campaign_id IS NOT NULL
         OR b.landing_adset_id IS NOT NULL
-        OR b.landing_ad_id IS NOT NULL THEN 'meta_ids'
-      ELSE 'campaign_name'
+        OR b.landing_ad_id IS NOT NULL THEN 'meta_url_ids'
+      ELSE 'meta_name_fallback'
     END AS meta_match_method,
     mad.adset_id AS meta_adset_id,
     mad.adset_name AS meta_adset_name,
@@ -245,7 +245,7 @@ SELECT
     ELSE NULL
   END AS matched_platform,
   CASE
-    WHEN google_matched_gclid IS NOT NULL THEN 'gclid'
+    WHEN google_matched_gclid IS NOT NULL THEN 'google_gclid'
     WHEN meta_match_method IS NOT NULL THEN meta_match_method
     ELSE 'none'
   END AS match_method,

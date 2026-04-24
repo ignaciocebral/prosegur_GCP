@@ -56,9 +56,16 @@ assert.ok(
 );
 
 assert.ok(
-  attributionSql.includes("THEN 'meta_ids'") &&
+  attributionSql.includes("THEN 'meta_url_ids'") &&
   attributionSql.includes("WHEN meta_match_method IS NOT NULL THEN meta_match_method"),
   "The final attribution output should expose when Meta rows were matched through IDs."
+);
+
+assert.ok(
+  attributionSql.includes("ELSE 'meta_name_fallback'") &&
+  attributionSql.includes("THEN 'google_gclid'") &&
+  attributionSql.includes("ELSE 'none'"),
+  "match_method values should be explicit about Google gclid matches, Meta URL ID matches, Meta fallback matches, and no-match rows."
 );
 
 assert.ok(
