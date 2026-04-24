@@ -20,10 +20,10 @@ assert.ok(
 );
 
 assert.ok(
-  sessionKeysSql.includes("campaign_id=([^&#]+)") &&
+  !sessionKeysSql.includes("campaign_id=([^&#]+)") &&
   sessionKeysSql.includes("adset_id=([^&#]+)") &&
   sessionKeysSql.includes("ad_id=([^&#]+)"),
-  "Session keys staging should parse campaign_id, adset_id and ad_id directly from landing_page_location."
+  "Session keys staging should parse adset_id and ad_id directly from landing_page_location and should not expect a campaign_id URL parameter."
 );
 
 assert.ok(
