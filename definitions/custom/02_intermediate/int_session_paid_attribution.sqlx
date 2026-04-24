@@ -188,6 +188,7 @@ SELECT
   session_id,
   session_date,
   user_pseudo_id,
+  landing_page_location,
   landing_page_path,
   landing_content_group,
   source,
