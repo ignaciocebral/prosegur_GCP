@@ -716,6 +716,14 @@ const PROPERTY_SOURCE_MAPPINGS = {
     metaAdsProject: "spring-line-421422",
     metaAdsSource: "meta_api_insights"
   },
+  superform_outputs_297318261: {
+    releaseConfigId: "alemania",
+    ga4Dataset: "analytics_297318261",
+    googleAdsCustomerId: "9589630427",
+    metaAdsAccountNames: null,
+    metaAdsProject: "spring-line-421422",
+    metaAdsSource: "meta_api_insights"
+  },
   superform_outputs_297326645: {
     releaseConfigId: "colombia",
     ga4Dataset: "analytics_297326645",
@@ -740,6 +748,14 @@ const PROPERTY_SOURCE_MAPPINGS = {
     metaAdsProject: "spring-line-421422",
     metaAdsSource: "meta_api_insights"
   },
+  superform_outputs_297350911: {
+    releaseConfigId: "mexico",
+    ga4Dataset: "analytics_297350911",
+    googleAdsCustomerId: "4257302672",
+    metaAdsAccountNames: null,
+    metaAdsProject: "spring-line-421422",
+    metaAdsSource: "meta_api_insights"
+  },
   superform_outputs_297377934: {
     releaseConfigId: "uruguay",
     ga4Dataset: "analytics_297377934",
@@ -761,6 +777,30 @@ const PROPERTY_SOURCE_MAPPINGS = {
     ga4Dataset: "analytics_297430230",
     googleAdsCustomerId: "9812854435",
     metaAdsAccountNames: "Prosegur Cash Paraguay|Prosegur Cash Paraguay_refresh",
+    metaAdsProject: "spring-line-421422",
+    metaAdsSource: "meta_api_insights"
+  },
+  superform_outputs_301773812: {
+    releaseConfigId: "honduras",
+    ga4Dataset: "analytics_301773812",
+    googleAdsCustomerId: null,
+    metaAdsAccountNames: null,
+    metaAdsProject: "spring-line-421422",
+    metaAdsSource: "meta_api_insights"
+  },
+  superform_outputs_301780572: {
+    releaseConfigId: "costa_rica",
+    ga4Dataset: "analytics_301780572",
+    googleAdsCustomerId: "2868362260",
+    metaAdsAccountNames: null,
+    metaAdsProject: "spring-line-421422",
+    metaAdsSource: "meta_api_insights"
+  },
+  superform_outputs_301798001: {
+    releaseConfigId: "guatemala",
+    ga4Dataset: "analytics_301798001",
+    googleAdsCustomerId: null,
+    metaAdsAccountNames: null,
     metaAdsProject: "spring-line-421422",
     metaAdsSource: "meta_api_insights"
   }
@@ -1345,6 +1385,7 @@ module.exports = {
   COMPARISON_YEAR,
   DELIVERY_MEDIUM,
   FILTERS_VERSION,
+  PROPERTY_SOURCE_MAPPINGS,
   SOURCE_START_DATE,
   TEMPLATE_YEAR,
   buildCcDailySql,

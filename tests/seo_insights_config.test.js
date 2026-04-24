@@ -15,6 +15,7 @@ assert.ok(
 );
 
 const sourceMappingSql = seoInsights.buildSourceMappingDimSql();
+const propertySourceMappings = seoInsights.PROPERTY_SOURCE_MAPPINGS;
 
 assert.ok(
   sourceMappingSql.includes("AS ga4_property_id") &&
@@ -29,6 +30,24 @@ assert.ok(
     sourceMappingSql.includes("'1703013237' AS google_ads_customer_id") &&
     sourceMappingSql.includes("'searchconsole_es' AS search_console_dataset"),
   "The SEO source mapping dim should map Spain output, Google Ads customer, and Search Console dataset."
+);
+
+assert.deepStrictEqual(
+  {
+    alemania: propertySourceMappings.superform_outputs_297318261.googleAdsCustomerId,
+    mexico: propertySourceMappings.superform_outputs_297350911.googleAdsCustomerId,
+    costaRica: propertySourceMappings.superform_outputs_301780572.googleAdsCustomerId,
+    honduras: propertySourceMappings.superform_outputs_301773812.googleAdsCustomerId,
+    guatemala: propertySourceMappings.superform_outputs_301798001.googleAdsCustomerId
+  },
+  {
+    alemania: "9589630427",
+    mexico: "4257302672",
+    costaRica: "2868362260",
+    honduras: null,
+    guatemala: null
+  },
+  "Additional GA4 output datasets should carry the Google Ads customer IDs currently available in the PRO MCC transfer."
 );
 
 assert.ok(
