@@ -27,9 +27,9 @@ assert.ok(
 );
 
 assert.ok(
-  sessionKeysSql.includes("campaign_name=([0-9]+)") &&
-  sessionKeysSql.includes("utm_id=([0-9]+)"),
-  "Session keys staging should also recover a numeric Meta campaign ID from campaign_name or the numeric prefix of utm_id."
+  sessionKeysSql.includes("utm_id=([0-9]+)") &&
+  !sessionKeysSql.includes("campaign_name=([0-9]+)"),
+  "Session keys staging should trust the numeric prefix of utm_id for Meta campaign IDs and should not infer IDs from campaign_name."
 );
 
 assert.ok(
