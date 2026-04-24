@@ -43,6 +43,13 @@ assert.ok(
 );
 
 assert.ok(
+  attributionSql.includes("mc.campaign_id IS NOT NULL") &&
+  attributionSql.includes("mc.campaign_id = mad.campaign_id") &&
+  !attributionSql.includes("b.landing_campaign_id = mad.campaign_id"),
+  "Meta ad attribution should only enrich rows after a real Meta campaign match and should key ad lookup off mc.campaign_id."
+);
+
+assert.ok(
   attributionSql.includes("b.landing_adset_id = mad.adset_id") &&
   attributionSql.includes("b.landing_ad_id = mad.ad_id"),
   "Meta ad attribution should prefer adset_id and ad_id when both are present."
@@ -53,6 +60,12 @@ assert.ok(
   attributionSql.includes("LOWER(TRIM(b.term)) = LOWER(TRIM(mad.adset_name))") &&
   attributionSql.includes("LOWER(TRIM(b.content)) = LOWER(TRIM(mad.ad_name))"),
   "Meta ad attribution should fall back to term/content name matching when ad IDs are unavailable."
+);
+
+assert.ok(
+  attributionSql.includes("WHEN b.landing_campaign_id IS NOT NULL THEN 'meta_url_ids'") &&
+  !attributionSql.includes("WHEN b.landing_campaign_id IS NOT NULL\n        OR b.landing_adset_id IS NOT NULL\n        OR b.landing_ad_id IS NOT NULL THEN 'meta_url_ids'"),
+  "Meta match_method should report meta_url_ids only when the Meta campaign itself matched via landing_campaign_id."
 );
 
 assert.ok(

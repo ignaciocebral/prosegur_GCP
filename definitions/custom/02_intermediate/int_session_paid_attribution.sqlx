@@ -166,9 +166,7 @@ joined AS (
     mc.campaign_name AS meta_campaign_name,
     CASE
       WHEN mc.campaign_id IS NULL THEN NULL
-      WHEN b.landing_campaign_id IS NOT NULL
-        OR b.landing_adset_id IS NOT NULL
-        OR b.landing_ad_id IS NOT NULL THEN 'meta_url_ids'
+      WHEN b.landing_campaign_id IS NOT NULL THEN 'meta_url_ids'
       ELSE 'meta_name_fallback'
     END AS meta_match_method,
     mad.adset_id AS meta_adset_id,
@@ -188,12 +186,9 @@ joined AS (
       (b.landing_campaign_id IS NULL AND LOWER(TRIM(b.campaign)) = LOWER(TRIM(mc.campaign_name)))
     )
   LEFT JOIN meta_ad_lookup mad
-    ON b.session_date = mad.date
-    AND (
-      (b.landing_campaign_id IS NOT NULL AND b.landing_campaign_id = mad.campaign_id)
-      OR
-      (b.landing_campaign_id IS NULL AND LOWER(TRIM(mc.campaign_name)) = LOWER(TRIM(mad.campaign_name)))
-    )
+    ON mc.campaign_id IS NOT NULL
+    AND mc.date = mad.date
+    AND mc.campaign_id = mad.campaign_id
     AND (
       (
         b.landing_adset_id IS NOT NULL
