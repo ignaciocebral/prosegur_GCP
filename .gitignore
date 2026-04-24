@@ -3,3 +3,10 @@ node_modules/
 .tmp_spain_conversion_audit.sql
 .tmp_publish_main_clean/
 .tmp_rebeca_publish/
+__pycache__/
+output/
+tmp_live_api_validation.json
+tmp_live_api_validation.py
+scripts/
+GOOGLE_ADS_MAPPING.md
+META_ADS_MAPPING.md
