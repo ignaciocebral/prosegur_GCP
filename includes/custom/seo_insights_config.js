@@ -47,6 +47,11 @@ function hasGscUrlScope(market) {
   return Boolean(market.gscUrlIncludeRegex);
 }
 
+function propertyIdFromOutputDataset(outputDataset) {
+  const match = String(outputDataset || "").match(/(\d+)$/);
+  return match ? match[1] : null;
+}
+
 const GA4_MARKETS = [
   {
     businessLine: "cash",
@@ -676,11 +681,94 @@ const SALES_SOURCE_CONFIGS = [
   }
 ];
 
+const PROPERTY_SOURCE_MAPPINGS = {
+  superform_outputs_286664974: {
+    releaseConfigId: "espana",
+    ga4Dataset: "analytics_286664974",
+    googleAdsCustomerId: "1703013237",
+    metaAdsAccountNames: "Prosegur Espa\u00f1a",
+    metaAdsProject: "spring-line-421422",
+    metaAdsSource: "meta_api_insights"
+  },
+  superform_outputs_297138761: {
+    releaseConfigId: "portugal",
+    ga4Dataset: "analytics_297138761",
+    googleAdsCustomerId: "8037331123",
+    metaAdsAccountNames: "Prosegur Cash Portugal",
+    metaAdsProject: "spring-line-421422",
+    metaAdsSource: "meta_api_insights"
+  },
+  superform_outputs_297153875: {
+    releaseConfigId: "argentina",
+    ga4Dataset: "analytics_297153875",
+    googleAdsCustomerId: "4263469660",
+    metaAdsAccountNames: "Prosegur Cash Argentina",
+    metaAdsProject: "spring-line-421422",
+    metaAdsSource: "meta_api_insights"
+  },
+  superform_outputs_297193664: {
+    releaseConfigId: "brasil",
+    ga4Dataset: "analytics_297193664",
+    googleAdsCustomerId: "9192320856",
+    metaAdsAccountNames: "Prosegur Brasil",
+    metaAdsProject: "spring-line-421422",
+    metaAdsSource: "meta_api_insights"
+  },
+  superform_outputs_297326645: {
+    releaseConfigId: "colombia",
+    ga4Dataset: "analytics_297326645",
+    googleAdsCustomerId: "2412701548",
+    metaAdsAccountNames: "Prosegur Cash Colombia",
+    metaAdsProject: "spring-line-421422",
+    metaAdsSource: "meta_api_insights"
+  },
+  superform_outputs_297333202: {
+    releaseConfigId: "ecuador",
+    ga4Dataset: "analytics_297333202",
+    googleAdsCustomerId: "2213354917",
+    metaAdsAccountNames: "Prosegur Cash Ecuador",
+    metaAdsProject: "spring-line-421422",
+    metaAdsSource: "meta_api_insights"
+  },
+  superform_outputs_297349390: {
+    releaseConfigId: "chile",
+    ga4Dataset: "analytics_297349390",
+    googleAdsCustomerId: "2407906005",
+    metaAdsAccountNames: "Prosegur Cash Chile",
+    metaAdsProject: "spring-line-421422",
+    metaAdsSource: "meta_api_insights"
+  },
+  superform_outputs_297377934: {
+    releaseConfigId: "uruguay",
+    ga4Dataset: "analytics_297377934",
+    googleAdsCustomerId: "7630556878",
+    metaAdsAccountNames: "Prosegur Cash Uruguay|Prosegur Cash Uruguay_dolar|Prosegur Cash Uruguay_",
+    metaAdsProject: "spring-line-421422",
+    metaAdsSource: "meta_api_insights"
+  },
+  superform_outputs_297412517: {
+    releaseConfigId: "peru",
+    ga4Dataset: "analytics_297412517",
+    googleAdsCustomerId: "3987648656",
+    metaAdsAccountNames: null,
+    metaAdsProject: "spring-line-421422",
+    metaAdsSource: "meta_api_insights"
+  },
+  superform_outputs_297430230: {
+    releaseConfigId: "paraguay",
+    ga4Dataset: "analytics_297430230",
+    googleAdsCustomerId: "9812854435",
+    metaAdsAccountNames: "Prosegur Cash Paraguay|Prosegur Cash Paraguay_refresh",
+    metaAdsProject: "spring-line-421422",
+    metaAdsSource: "meta_api_insights"
+  }
+};
+
 function sqlString(value) {
   if (value === null || value === undefined) {
     return "NULL";
   }
-  return `'${String(value).replace(/\\/g, "\\\\").replace(/'/g, "''")}'`;
+  return `'${String(value).replace(/\\/g, "\\\\").replace(/'/g, "\\'")}'`;
 }
 
 function sqlBool(value) {
@@ -872,6 +960,42 @@ function buildFilterSpecsSql() {
       `${sqlString(market.gscUrlIncludeRegex || null)} AS gsc_url_include_regex`,
       `${sqlString(market.gscUrlExcludeRegex || null)} AS gsc_url_exclude_regex`,
       `${sqlString(hasGscUrlScope(market) ? "market_scope" : "country_aggregate")} AS gsc_scope_status`
+    ].join(", ");
+  });
+
+  return rows.join("\nUNION ALL\n");
+}
+
+function buildSourceMappingDimSql() {
+  const rows = GA4_MARKETS.map((market) => {
+    const mapping = PROPERTY_SOURCE_MAPPINGS[market.outputDataset] || {};
+    const ga4Dataset = mapping.ga4Dataset || `analytics_${propertyIdFromOutputDataset(market.outputDataset)}`;
+    const ga4PropertyId = propertyIdFromOutputDataset(ga4Dataset);
+    const gscDataset = gscDatasetForMarket(market);
+
+    return [
+      `SELECT ${sqlString(FILTERS_VERSION)} AS filters_version`,
+      `${sqlString(market.market)} AS market`,
+      `${sqlString(market.businessLine)} AS business_line`,
+      `${sqlString(market.countryCode)} AS country_code`,
+      `${sqlString(mapping.releaseConfigId || null)} AS release_config_id`,
+      `${sqlString(PROJECT_ID)} AS ga4_project`,
+      `${sqlString(ga4Dataset)} AS ga4_dataset`,
+      `${sqlString(ga4PropertyId)} AS ga4_property_id`,
+      `${sqlString(market.outputDataset)} AS ga4_output_dataset`,
+      `${sqlString(mapping.googleAdsCustomerId || null)} AS google_ads_customer_id`,
+      `${sqlString(mapping.metaAdsProject || null)} AS meta_ads_project`,
+      `${sqlString(mapping.metaAdsSource || null)} AS meta_ads_source`,
+      `${sqlString(mapping.metaAdsAccountNames || null)} AS meta_ads_account_names`,
+      `${sqlString(PROJECT_ID)} AS search_console_project`,
+      `${sqlString(gscDataset)} AS search_console_dataset`,
+      `${sqlString(`${gscDataset}.searchdata_url_impression`)} AS search_console_table`,
+      `${sqlArray(market.gscSiteUrlInclude || [])} AS gsc_site_url_include`,
+      `${sqlString(market.gscUrlIncludeRegex || null)} AS gsc_url_include_regex`,
+      `${sqlString(market.gscUrlExcludeRegex || null)} AS gsc_url_exclude_regex`,
+      `${sqlString(hasGscUrlScope(market) ? "market_scope" : "country_aggregate")} AS gsc_scope_status`,
+      `${sqlString(market.filterValidationStatus)} AS filter_validation_status`,
+      `${sqlBool(market.includeInMasterExport)} AS export_to_master`
     ].join(", ");
   });
 
@@ -1226,5 +1350,6 @@ module.exports = {
   buildFilterSpecsSql,
   buildGa4DailySql,
   buildGscDailySql,
+  buildSourceMappingDimSql,
   buildSalesDailySql
 };
