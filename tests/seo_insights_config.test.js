@@ -31,5 +31,18 @@ assert.ok(
   "The SEO source mapping dim should map Spain output, Google Ads customer, and Search Console dataset."
 );
 
-console.log("seo insights config regression tests passed");
+assert.ok(
+  filterSpecsSql
+    .split("\nUNION ALL\n")
+    .find((row) => row.includes("'Cash PE' AS market"))
+    .includes(
+      "'^https?://(www\\\\.)?prosegur\\\\.com\\\\.pe/(?:(?:negocios|empresas)/soluciones-efectivo|blog/efectivo)(?:/|$)' AS gsc_url_include_regex"
+    ) &&
+    filterSpecsSql
+      .split("\nUNION ALL\n")
+      .find((row) => row.includes("'Cash PE' AS market"))
+      .includes("'market_scope' AS gsc_scope_status"),
+  "Cash PE should expose a market-level Search Console URL scope."
+);
 
+console.log("seo insights config regression tests passed");
