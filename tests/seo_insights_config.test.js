@@ -50,4 +50,18 @@ assert.deepStrictEqual(
   "Additional GA4 output datasets should carry the Google Ads customer IDs currently available in the PRO MCC transfer."
 );
 
+assert.ok(
+  filterSpecsSql
+    .split("\nUNION ALL\n")
+    .find((row) => row.includes("'Cash PE' AS market"))
+    .includes(
+      "'^https?://(www\\\\.)?prosegur\\\\.com\\\\.pe/(?:(?:negocios|empresas)/soluciones-efectivo|blog/efectivo)(?:/|$)' AS gsc_url_include_regex"
+    ) &&
+    filterSpecsSql
+      .split("\nUNION ALL\n")
+      .find((row) => row.includes("'Cash PE' AS market"))
+      .includes("'market_scope' AS gsc_scope_status"),
+  "Cash PE should expose a market-level Search Console URL scope."
+);
+
 console.log("seo insights config regression tests passed");
