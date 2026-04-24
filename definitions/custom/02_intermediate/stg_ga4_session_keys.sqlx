@@ -49,7 +49,11 @@ SELECT
   s.session_source.campaign_id AS campaign_id,
   s.session_source.term AS term,
   s.session_source.content AS content,
-  NULLIF(LOWER(REGEXP_EXTRACT(s.landing_page.landing_page_location, r"^[^#]+[?&]campaign_id=([^&#]+)")), '') AS landing_campaign_id,
+  COALESCE(
+    NULLIF(LOWER(REGEXP_EXTRACT(s.landing_page.landing_page_location, r"^[^#]+[?&]campaign_id=([^&#]+)")), ''),
+    NULLIF(LOWER(REGEXP_EXTRACT(s.landing_page.landing_page_location, r"^[^#]+[?&]campaign_name=([0-9]+)")), ''),
+    NULLIF(LOWER(REGEXP_EXTRACT(s.landing_page.landing_page_location, r"^[^#]+[?&]utm_id=([0-9]+)")), '')
+  ) AS landing_campaign_id,
   NULLIF(LOWER(REGEXP_EXTRACT(s.landing_page.landing_page_location, r"^[^#]+[?&]adset_id=([^&#]+)")), '') AS landing_adset_id,
   NULLIF(LOWER(REGEXP_EXTRACT(s.landing_page.landing_page_location, r"^[^#]+[?&]ad_id=([^&#]+)")), '') AS landing_ad_id,
   s.session_source.default_channel_grouping AS default_channel_grouping,

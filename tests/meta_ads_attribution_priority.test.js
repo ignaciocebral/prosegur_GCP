@@ -27,6 +27,12 @@ assert.ok(
 );
 
 assert.ok(
+  sessionKeysSql.includes("campaign_name=([0-9]+)") &&
+  sessionKeysSql.includes("utm_id=([0-9]+)"),
+  "Session keys staging should also recover a numeric Meta campaign ID from campaign_name or the numeric prefix of utm_id."
+);
+
+assert.ok(
   attributionSql.includes("b.landing_campaign_id = mc.campaign_id"),
   "Meta campaign attribution should first attempt a campaign_id join."
 );
