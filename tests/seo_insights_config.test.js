@@ -15,6 +15,7 @@ assert.ok(
 );
 
 const sourceMappingSql = seoInsights.buildSourceMappingDimSql();
+const propertySourceMappings = seoInsights.PROPERTY_SOURCE_MAPPINGS;
 
 assert.ok(
   sourceMappingSql.includes("AS ga4_property_id") &&
@@ -31,5 +32,36 @@ assert.ok(
   "The SEO source mapping dim should map Spain output, Google Ads customer, and Search Console dataset."
 );
 
-console.log("seo insights config regression tests passed");
+assert.deepStrictEqual(
+  {
+    alemania: propertySourceMappings.superform_outputs_297318261.googleAdsCustomerId,
+    mexico: propertySourceMappings.superform_outputs_297350911.googleAdsCustomerId,
+    costaRica: propertySourceMappings.superform_outputs_301780572.googleAdsCustomerId,
+    honduras: propertySourceMappings.superform_outputs_301773812.googleAdsCustomerId,
+    guatemala: propertySourceMappings.superform_outputs_301798001.googleAdsCustomerId
+  },
+  {
+    alemania: "9589630427",
+    mexico: "4257302672",
+    costaRica: "2868362260",
+    honduras: null,
+    guatemala: null
+  },
+  "Additional GA4 output datasets should carry the Google Ads customer IDs currently available in the PRO MCC transfer."
+);
 
+assert.ok(
+  filterSpecsSql
+    .split("\nUNION ALL\n")
+    .find((row) => row.includes("'Cash PE' AS market"))
+    .includes(
+      "'^https?://(www\\\\.)?prosegur\\\\.com\\\\.pe/(?:(?:negocios|empresas)/soluciones-efectivo|blog/efectivo)(?:/|$)' AS gsc_url_include_regex"
+    ) &&
+    filterSpecsSql
+      .split("\nUNION ALL\n")
+      .find((row) => row.includes("'Cash PE' AS market"))
+      .includes("'market_scope' AS gsc_scope_status"),
+  "Cash PE should expose a market-level Search Console URL scope."
+);
+
+console.log("seo insights config regression tests passed");
