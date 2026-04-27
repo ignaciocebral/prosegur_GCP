@@ -33,8 +33,21 @@ assert.ok(
 );
 
 assert.ok(
+  sessionKeysSql.includes("is_meta_matching_excluded_url") &&
+  sessionKeysSql.includes("meta_matching_exclusion_reason") &&
+  sessionKeysSql.includes("alarm_url_out_of_scope") &&
+  sessionKeysSql.includes("r'alarm'"),
+  "Session keys staging should mark alarm URLs as out of scope for managed Meta match-quality reporting."
+);
+
+assert.ok(
   attributionSql.includes("b.landing_campaign_id = mc.campaign_id"),
   "Meta campaign attribution should first attempt a campaign_id join."
+);
+
+assert.ok(
+  attributionSql.includes("AND NOT b.is_meta_matching_excluded_url"),
+  "Meta campaign attribution should skip URL scopes excluded from managed Meta matching."
 );
 
 assert.ok(
@@ -84,6 +97,12 @@ assert.ok(
 assert.ok(
   !attributionSql.includes("NOT REGEXP_CONTAINS(COALESCE(b.term, ''), r'^[0-9]+$')"),
   "The old numeric-term guard should be removed once explicit ID joins are supported."
+);
+
+assert.ok(
+  attributionSql.includes("is_meta_matching_eligible") &&
+  attributionSql.includes("AND NOT is_meta_matching_excluded_url AS is_meta_matching_eligible"),
+  "The final attribution output should expose a denominator flag for managed Meta matching quality."
 );
 
 console.log("meta ads attribution priority regression tests passed");

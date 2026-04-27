@@ -1,0 +1,77 @@
+{
+  "_run_timestamp": "Timestamp when this mart row was produced by Dataform.",
+  "session_id": "GA4 session identifier. Grain of this mart is one row per session_id.",
+  "session_date": "Session date in the configured local reporting timezone.",
+  "user_pseudo_id": "GA4 user pseudo ID associated with the session.",
+  "landing_page_location": "Full landing page URL captured for the session landing page.",
+  "landing_page_path": "Path component of the session landing page.",
+  "landing_content_group": "Landing page content group from GA4 session modeling.",
+  "source": "GA4 session source from first-session attribution fields.",
+  "medium": "GA4 session medium from first-session attribution fields.",
+  "campaign": "GA4 session campaign name from first-session attribution fields.",
+  "campaign_id": "GA4 session campaign ID when available.",
+  "term": "GA4 session term value, often used as keyword/adset carrier depending on platform tagging.",
+  "content": "GA4 session content value, often used as creative/ad carrier depending on platform tagging.",
+  "landing_campaign_id": "Numeric campaign ID extracted from landing URL utm_id. For Meta, this is the preferred campaign join key when present.",
+  "landing_adset_id": "Meta ad set ID extracted from landing URL adset_id when Meta URL templates provide it.",
+  "landing_ad_id": "Meta ad ID extracted from landing URL ad_id when Meta URL templates provide it.",
+  "is_meta_matching_excluded_url": "True when the landing URL/path contains 'alarm'. These sessions are treated as out of scope for managed Meta matching quality because alarm/alarmas campaigns are not managed in this reporting scope.",
+  "meta_matching_exclusion_reason": "Reason the session is excluded from Meta match-quality denominators. Current value: alarm_url_out_of_scope.",
+  "is_meta_matching_eligible": "True when the session source is Meta-like and the URL is not excluded. Use this as the denominator for Meta GA4-to-Ads match quality.",
+  "default_channel_grouping": "GA4 default channel grouping for the session.",
+  "session_gclid": "Google Click ID used for deterministic Google Ads matching when present.",
+  "session_dclid": "DoubleClick click ID captured on the session when present.",
+  "session_srsltid": "Google organic shopping/search result ID captured on the session when present.",
+  "session_gbraid": "Google gbraid identifier captured on the session when present.",
+  "session_wbraid": "Google wbraid identifier captured on the session when present.",
+  "session_msclkid": "Microsoft Ads click ID captured on the session when present.",
+  "lnd_source": "GA4 last-non-direct source for the session.",
+  "lnd_medium": "GA4 last-non-direct medium for the session.",
+  "lnd_campaign": "GA4 last-non-direct campaign name for the session.",
+  "lnd_campaign_id": "GA4 last-non-direct campaign ID for the session.",
+  "lnd_default_channel_grouping": "GA4 last-non-direct default channel grouping for the session.",
+  "matched_platform": "Paid platform that matched this session deterministically. Values include google_ads, meta_ads, or null.",
+  "match_method": "Deterministic match method used for paid enrichment. google_gclid means Google click ID; meta_url_ids means Meta campaign matched through landing URL IDs; meta_name_fallback means Meta matched through campaign name; none means no paid-platform match.",
+  "channel": "Canonical reporting channel derived from paid-platform matches first, then click IDs, then GA4 channel grouping.",
+  "matched_account_id": "Paid-platform account ID/name surrogate associated with the matched paid session.",
+  "matched_account_name": "Paid-platform account name associated with the matched paid session.",
+  "matched_campaign_id": "Paid-platform campaign ID associated with the matched paid session.",
+  "matched_campaign_name": "Paid-platform campaign name associated with the matched paid session.",
+  "matched_ad_group_or_adset_id": "Google ad group ID or Meta ad set ID associated with the matched paid session when available.",
+  "matched_ad_group_or_adset_name": "Google ad group name or Meta ad set name associated with the matched paid session when available.",
+  "paid_attribution": {
+    "description": "Structured paid-media attribution detail for the matched session.",
+    "columns": {
+      "google_ads": {
+        "description": "Google Ads match detail populated when the session matched by gclid.",
+        "columns": {
+          "matched_date": "Google Ads click/performance date used for the match.",
+          "customer_id": "Google Ads customer ID.",
+          "account_name": "Google Ads account name.",
+          "campaign_id": "Google Ads campaign ID.",
+          "campaign_name": "Google Ads campaign name.",
+          "ad_group_id": "Google Ads ad group ID.",
+          "ad_group_name": "Google Ads ad group name.",
+          "keyword_text": "Google Ads keyword text from click mapping when available.",
+          "keyword_match_text": "Google Ads matched keyword text when available.",
+          "keyword_match_type": "Google Ads keyword match type when available."
+        }
+      },
+      "meta_ads": {
+        "description": "Meta Ads match detail populated when the session matched by Meta campaign ID/name and optional adset/ad IDs.",
+        "columns": {
+          "matched_date": "Meta Ads reporting date used for the match.",
+          "account_id": "Meta account identifier from the configured Meta source.",
+          "account_name": "Meta account name from the configured Meta source.",
+          "ad_account_name": "Meta ad account name from the configured Meta source.",
+          "campaign_id": "Meta campaign ID matched from landing URL utm_id or campaign-name fallback.",
+          "campaign_name": "Meta campaign name from the configured Meta source.",
+          "adset_id": "Meta ad set ID matched from landing URL adset_id or name fallback when available.",
+          "adset_name": "Meta ad set name from the configured Meta source.",
+          "ad_id": "Meta ad ID matched from landing URL ad_id or name fallback when available.",
+          "ad_name": "Meta ad name from the configured Meta source."
+        }
+      }
+    }
+  }
+}
