@@ -179,6 +179,7 @@ joined AS (
     AND b.session_date = g.date
   LEFT JOIN meta_campaign_agg mc
     ON b.session_date = mc.date
+    AND NOT b.is_meta_matching_excluded_url
     AND LOWER(COALESCE(b.source, '')) IN ('meta', 'facebook', 'fb', 'ig', 'instagram', 'facebook.com', 'l.facebook.com', 'lm.facebook.com')
     AND (
       (b.landing_campaign_id IS NOT NULL AND b.landing_campaign_id = mc.campaign_id)
@@ -222,6 +223,10 @@ SELECT
   landing_campaign_id,
   landing_adset_id,
   landing_ad_id,
+  is_meta_matching_excluded_url,
+  meta_matching_exclusion_reason,
+  LOWER(COALESCE(source, '')) IN ('meta', 'facebook', 'fb', 'ig', 'instagram', 'facebook.com', 'l.facebook.com', 'lm.facebook.com')
+    AND NOT is_meta_matching_excluded_url AS is_meta_matching_eligible,
   default_channel_grouping,
   session_gclid,
   session_dclid,

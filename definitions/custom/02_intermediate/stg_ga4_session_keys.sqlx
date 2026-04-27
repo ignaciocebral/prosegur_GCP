@@ -52,6 +52,17 @@ SELECT
   NULLIF(LOWER(REGEXP_EXTRACT(s.landing_page.landing_page_location, r"^[^#]+[?&]utm_id=([0-9]+)")), '') AS landing_campaign_id,
   NULLIF(LOWER(REGEXP_EXTRACT(s.landing_page.landing_page_location, r"^[^#]+[?&]adset_id=([^&#]+)")), '') AS landing_adset_id,
   NULLIF(LOWER(REGEXP_EXTRACT(s.landing_page.landing_page_location, r"^[^#]+[?&]ad_id=([^&#]+)")), '') AS landing_ad_id,
+  REGEXP_CONTAINS(
+    LOWER(COALESCE(s.landing_page.landing_page_location, s.landing_page.landing_page_path, '')),
+    r'alarm'
+  ) AS is_meta_matching_excluded_url,
+  CASE
+    WHEN REGEXP_CONTAINS(
+      LOWER(COALESCE(s.landing_page.landing_page_location, s.landing_page.landing_page_path, '')),
+      r'alarm'
+    ) THEN 'alarm_url_out_of_scope'
+    ELSE NULL
+  END AS meta_matching_exclusion_reason,
   s.session_source.default_channel_grouping AS default_channel_grouping,
   COALESCE(s.session_source.gclid, s.last_non_direct_traffic_source.gclid) AS session_gclid,
   s.session_source.dclid AS session_dclid,
