@@ -64,4 +64,18 @@ assert.ok(
   "Cash PE should expose a market-level Search Console URL scope."
 );
 
+assert.ok(
+  filterSpecsSql
+    .split("\nUNION ALL\n")
+    .find((row) => row.includes("'Cash ES' AS market"))
+    .includes(
+      "'^https?://(www\\\\.)?prosegur\\\\.es/(?:(?:negocios-y-pymes|empresas)/soluciones-efectivo|blog/efectivo)(?:/|$)' AS gsc_url_include_regex"
+    ) &&
+    filterSpecsSql
+      .split("\nUNION ALL\n")
+      .find((row) => row.includes("'Cash ES' AS market"))
+      .includes("'market_scope' AS gsc_scope_status"),
+  "Cash ES should expose a market-level Search Console URL scope."
+);
+
 console.log("seo insights config regression tests passed");
