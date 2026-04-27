@@ -134,6 +134,7 @@ meta_campaign_agg AS (
 meta_ad_lookup AS (
   SELECT
     date,
+    campaign_id,
     campaign_name,
     adset_id,
     adset_name,
@@ -163,6 +164,11 @@ joined AS (
     mc.ad_account_name AS meta_ad_account_name,
     mc.campaign_id AS meta_campaign_id,
     mc.campaign_name AS meta_campaign_name,
+    CASE
+      WHEN mc.campaign_id IS NULL THEN NULL
+      WHEN b.landing_campaign_id IS NOT NULL THEN 'meta_url_ids'
+      ELSE 'meta_name_fallback'
+    END AS meta_match_method,
     mad.adset_id AS meta_adset_id,
     mad.adset_name AS meta_adset_name,
     mad.ad_id AS meta_ad_id,
@@ -174,13 +180,29 @@ joined AS (
   LEFT JOIN meta_campaign_agg mc
     ON b.session_date = mc.date
     AND LOWER(COALESCE(b.source, '')) IN ('meta', 'facebook', 'fb', 'ig', 'instagram', 'facebook.com', 'l.facebook.com', 'lm.facebook.com')
-    AND LOWER(TRIM(b.campaign)) = LOWER(TRIM(mc.campaign_name))
+    AND (
+      (b.landing_campaign_id IS NOT NULL AND b.landing_campaign_id = mc.campaign_id)
+      OR
+      (b.landing_campaign_id IS NULL AND LOWER(TRIM(b.campaign)) = LOWER(TRIM(mc.campaign_name)))
+    )
   LEFT JOIN meta_ad_lookup mad
-    ON b.session_date = mad.date
-    AND mc.campaign_name = mad.campaign_name
-    AND NOT REGEXP_CONTAINS(COALESCE(b.term, ''), r'^[0-9]+$')
-    AND LOWER(TRIM(b.term)) = LOWER(TRIM(mad.adset_name))
-    AND LOWER(TRIM(b.content)) = LOWER(TRIM(mad.ad_name))
+    ON mc.campaign_id IS NOT NULL
+    AND mc.date = mad.date
+    AND mc.campaign_id = mad.campaign_id
+    AND (
+      (
+        b.landing_adset_id IS NOT NULL
+        AND b.landing_ad_id IS NOT NULL
+        AND b.landing_adset_id = mad.adset_id
+        AND b.landing_ad_id = mad.ad_id
+      )
+      OR
+      (
+        (b.landing_adset_id IS NULL OR b.landing_ad_id IS NULL)
+        AND LOWER(TRIM(b.term)) = LOWER(TRIM(mad.adset_name))
+        AND LOWER(TRIM(b.content)) = LOWER(TRIM(mad.ad_name))
+      )
+    )
 )
 
 -- This final select builds the paid_attribution struct and keeps one best row per session.
@@ -197,6 +219,9 @@ SELECT
   campaign_id,
   term,
   content,
+  landing_campaign_id,
+  landing_adset_id,
+  landing_ad_id,
   default_channel_grouping,
   session_gclid,
   session_dclid,
@@ -215,8 +240,8 @@ SELECT
     ELSE NULL
   END AS matched_platform,
   CASE
-    WHEN google_matched_gclid IS NOT NULL THEN 'gclid'
-    WHEN meta_campaign_id IS NOT NULL THEN 'campaign_name'
+    WHEN google_matched_gclid IS NOT NULL THEN 'google_gclid'
+    WHEN meta_match_method IS NOT NULL THEN meta_match_method
     ELSE 'none'
   END AS match_method,
   CASE
