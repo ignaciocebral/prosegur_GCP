@@ -88,6 +88,8 @@ const GA4_MARKETS = [
     businessTypeIncludeRegex:
       "(^cash$|cash today|logistica de valores|gestao de numerario|subhome|bancos|correspondente autorizado|transporte internacional|servicos|deposito diario|varejistas|cooperativas de credito|supermercados|postos de combustiveis|farmacia)",
     businessTypeExcludeRegex: "(combine|corporat|alarm|avos|rrhh|security|segurpro)",
+    gscUrlIncludeRegex:
+      "^https?://(www\\.)?prosegur\\.com\\.br/(?:(?:pequenos-medios-negocios|grandes-empresas)|blog/dinheiro)(?:/|$)",
     hostnameInclude: [],
     hostnameExclude: DEFAULT_HOSTNAME_EXCLUDE,
     pageIncludeRegex: null,
@@ -108,6 +110,8 @@ const GA4_MARKETS = [
     trafficScope: "organic_search",
     businessTypeIncludeRegex: "(^cash$|cash today|logistica de valores|transporte internacional)",
     businessTypeExcludeRegex: "(combine|corporate|alarm|avos|rrhh|security|seguridad|isoc|hybrid|vigilancia|proteccion|ojo del halcon)",
+    gscUrlIncludeRegex:
+      "^https?://(www\\.)?prosegur\\.com\\.ar/(?:(?:negocios-pymes|empresas-instituciones)/soluciones-efectivo|blog/efectivo)(?:/|$)",
     hostnameInclude: [],
     hostnameExclude: DEFAULT_HOSTNAME_EXCLUDE,
     pageIncludeRegex: null,
@@ -128,6 +132,8 @@ const GA4_MARKETS = [
     trafficScope: "organic_search",
     businessTypeIncludeRegex: "(^cash$|cash today)",
     businessTypeExcludeRegex: "(combine|corporate|alarm|avos|rrhh|security|cipher)",
+    gscUrlIncludeRegex:
+      "^https?://(www\\.)?prosegur\\.com\\.co/(?:(?:negocios|empresas)/soluciones-efectivo|blog/efectivo)(?:/|$)",
     hostnameInclude: [],
     hostnameExclude: DEFAULT_HOSTNAME_EXCLUDE,
     pageIncludeRegex: null,
@@ -193,6 +199,8 @@ const GA4_MARKETS = [
     businessTypeIncludeRegex:
       "(^cash$|cash - pymes|cash - empresas|cash today|logistica de valores|gestion efectivo|cajeros|subhome)",
     businessTypeExcludeRegex: "(combine|corporate|alarm|avos|rrhh|security|cipher)",
+    gscUrlIncludeRegex:
+      "^https?://(www\\.)?prosegur\\.cl/(?:(?:negocios|empresas)/soluciones-efectivo|blog/efectivo)(?:/|$)",
     hostnameInclude: [],
     hostnameExclude: DEFAULT_HOSTNAME_EXCLUDE,
     pageIncludeRegex: null,
@@ -213,6 +221,8 @@ const GA4_MARKETS = [
     trafficScope: "organic_search",
     businessTypeIncludeRegex: "(^cash$|cash today)",
     businessTypeExcludeRegex: "(combine|corporate|alarm|avos|rrhh|security|cipher)",
+    gscUrlIncludeRegex:
+      "^https?://(www\\.)?prosegur\\.ec/(?:(?:negocios|servicios)|blog/efectivo)(?:/|$)",
     hostnameInclude: [],
     hostnameExclude: DEFAULT_HOSTNAME_EXCLUDE,
     pageIncludeRegex: null,
@@ -316,6 +326,8 @@ const GA4_MARKETS = [
     trafficScope: "organic_search",
     businessTypeIncludeRegex: "(^security$|segurpro)",
     businessTypeExcludeRegex: "(combine|corporat|alarm|cash|avos|rrhh)",
+    gscUrlIncludeRegex:
+      "^https?://(www\\.)?segurpro\\.com\\.br/(?:(?:pequenos-medios-negocios(?:/filiais(?:/.*)?)?|grandes-negocios)|blog/seguranca)(?:/|$)",
     hostnameInclude: [],
     hostnameExclude: DEFAULT_HOSTNAME_EXCLUDE,
     pageIncludeRegex: null,
@@ -1053,11 +1065,7 @@ function buildSourceMappingDimSql() {
 function ga4BusinessFilter(alias, market) {
   const clauses = [`${alias}.session_id IS NOT NULL`];
 
-  if (market.gscUrlIncludeRegex) {
-    clauses.push(
-      `REGEXP_CONTAINS(LOWER(COALESCE(${alias}.page.location, '')), ${sqlString(market.gscUrlIncludeRegex)})`
-    );
-  } else {
+  if (market.businessTypeIncludeRegex) {
     clauses.push(
       `REGEXP_CONTAINS(LOWER(TRIM(COALESCE(${alias}.event_params_custom.BusinessType, ''))), ${sqlString(
         market.businessTypeIncludeRegex
@@ -1065,11 +1073,7 @@ function ga4BusinessFilter(alias, market) {
     );
   }
 
-  if (market.gscUrlIncludeRegex && market.gscUrlExcludeRegex) {
-    clauses.push(
-      `NOT REGEXP_CONTAINS(LOWER(COALESCE(${alias}.page.location, '')), ${sqlString(market.gscUrlExcludeRegex)})`
-    );
-  } else if (!market.gscUrlIncludeRegex && market.businessTypeExcludeRegex) {
+  if (market.businessTypeExcludeRegex) {
     clauses.push(
       `NOT REGEXP_CONTAINS(LOWER(TRIM(COALESCE(${alias}.event_params_custom.BusinessType, ''))), ${sqlString(
         market.businessTypeExcludeRegex
