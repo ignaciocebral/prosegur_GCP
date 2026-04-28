@@ -315,7 +315,7 @@ const GA4_MARKETS = [
     businessTypeIncludeRegex: "(^security$|segurpro)",
     businessTypeExcludeRegex: "(combine|corporat|alarm|cash|avos|rrhh)",
     gscUrlIncludeRegex:
-      "^https?://(www\\\\.)?segurpro\\\\.com\\\\.br/(?:(?:pequenos-medios-negocios(?:/filiais(?:/.*)?)?|grandes-negocios)|blog/seguranca)(?:/|$)",
+      "^https?://(www\\.)?segurpro\\.com\\.br/(?:(?:pequenos-medios-negocios(?:/filiais(?:/.*)?)?|grandes-negocios)|blog/seguranca)(?:/|$)",
     hostnameInclude: [],
     hostnameExclude: DEFAULT_HOSTNAME_EXCLUDE,
     pageIncludeRegex: null,

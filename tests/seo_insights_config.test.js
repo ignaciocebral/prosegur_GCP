@@ -97,7 +97,7 @@ assert.ok(
     .split("\nUNION ALL\n")
     .find((row) => row.includes("'Seg BR' AS market"))
     .includes(
-      "'^https?://(www\\\\\\\\.)?segurpro\\\\\\\\.com\\\\\\\\.br/(?:(?:pequenos-medios-negocios(?:/filiais(?:/.*)?)?|grandes-negocios)|blog/seguranca)(?:/|$)' AS gsc_url_include_regex"
+      "'^https?://(www\\\\.)?segurpro\\\\.com\\\\.br/(?:(?:pequenos-medios-negocios(?:/filiais(?:/.*)?)?|grandes-negocios)|blog/seguranca)(?:/|$)' AS gsc_url_include_regex"
     ) &&
     filterSpecsSql
       .split("\nUNION ALL\n")
