@@ -197,6 +197,8 @@ const GA4_MARKETS = [
     businessTypeIncludeRegex:
       "(^cash$|cash - pymes|cash - empresas|cash today|logistica de valores|gestion efectivo|cajeros|subhome)",
     businessTypeExcludeRegex: "(combine|corporate|alarm|avos|rrhh|security|cipher)",
+    gscUrlIncludeRegex:
+      "^https?://(www\\.)?prosegur\\.cl/(?:(?:negocios|empresas)/soluciones-efectivo|blog/efectivo)(?:/|$)",
     hostnameInclude: [],
     hostnameExclude: DEFAULT_HOSTNAME_EXCLUDE,
     pageIncludeRegex: null,
