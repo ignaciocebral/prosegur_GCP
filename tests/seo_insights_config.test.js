@@ -81,6 +81,20 @@ assert.ok(
 assert.ok(
   filterSpecsSql
     .split("\nUNION ALL\n")
+    .find((row) => row.includes("'Cash AR' AS market"))
+    .includes(
+      "'^https?://(www\\\\.)?prosegur\\\\.com\\\\.ar/(?:(?:negocios-pymes|empresas-instituciones)/soluciones-efectivo|blog/efectivo)(?:/|$)' AS gsc_url_include_regex"
+    ) &&
+    filterSpecsSql
+      .split("\nUNION ALL\n")
+      .find((row) => row.includes("'Cash AR' AS market"))
+      .includes("'market_scope' AS gsc_scope_status"),
+  "Cash AR should expose a market-level Search Console URL scope."
+);
+
+assert.ok(
+  filterSpecsSql
+    .split("\nUNION ALL\n")
     .find((row) => row.includes("'Cash PT' AS market"))
     .includes(
       "'^https?://(www\\\\.)?prosegur\\\\.pt/(?:(?:pequenas-medias-empresas|grandes-empresas)/solucoes-para-numerario|blog/numerario)(?:/|$)' AS gsc_url_include_regex"
@@ -122,6 +136,7 @@ assert.ok(
 
 const ga4DailySql = seoInsights.buildGa4DailySql();
 const cashEsGa4Scope = ga4DailySql.match(/WITH qualifying_sessions_Cash_ES AS \([\s\S]*?\n  \)\n  SELECT/)[0];
+const cashArGa4Scope = ga4DailySql.match(/WITH qualifying_sessions_Cash_AR AS \([\s\S]*?\n  \)\n  SELECT/)[0];
 const cashPtGa4Scope = ga4DailySql.match(/WITH qualifying_sessions_Cash_PT AS \([\s\S]*?\n  \)\n  SELECT/)[0];
 const segBrGa4Scope = ga4DailySql.match(/WITH qualifying_sessions_Seg_BR AS \([\s\S]*?\n  \)\n  SELECT/)[0];
 const cashEcGa4Scope = ga4DailySql.match(/WITH qualifying_sessions_Cash_EC AS \([\s\S]*?\n  \)\n  SELECT/)[0];
@@ -129,12 +144,15 @@ const cashBrGa4Scope = ga4DailySql.match(/WITH qualifying_sessions_Cash_BR AS \(
 
 assert.ok(
   cashEsGa4Scope.includes("event_params_custom.BusinessType") &&
+    cashArGa4Scope.includes("event_params_custom.BusinessType") &&
     cashPtGa4Scope.includes("event_params_custom.BusinessType") &&
     cashEcGa4Scope.includes("event_params_custom.BusinessType") &&
     !cashEsGa4Scope.includes("gscUrlIncludeRegex") &&
+    !cashArGa4Scope.includes("gscUrlIncludeRegex") &&
     !cashPtGa4Scope.includes("gscUrlIncludeRegex") &&
     !cashEcGa4Scope.includes("gscUrlIncludeRegex") &&
     !cashEsGa4Scope.includes("prosegur\\\\.es") &&
+    !cashArGa4Scope.includes("prosegur\\\\.com\\\\.ar") &&
     !cashPtGa4Scope.includes("prosegur\\\\.pt") &&
     !cashEcGa4Scope.includes("prosegur\\\\.ec") &&
     !segBrGa4Scope.includes("segurpro\\\\.com"),
