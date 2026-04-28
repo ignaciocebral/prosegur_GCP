@@ -2,15 +2,22 @@
 function buildCountryCodeFromNameSql(columnName) {
   return `
     CASE
-      WHEN REGEXP_CONTAINS(LOWER(COALESCE(${columnName}, '')), r'argentin') THEN 'Argentina'
-      WHEN REGEXP_CONTAINS(LOWER(COALESCE(${columnName}, '')), r'brasil|brazil') THEN 'Brasil'
-      WHEN REGEXP_CONTAINS(LOWER(COALESCE(${columnName}, '')), r'colombi') THEN 'Colombia'
+      WHEN REGEXP_CONTAINS(LOWER(COALESCE(${columnName}, '')), r'argentin') THEN 'AR'
+      WHEN REGEXP_CONTAINS(LOWER(COALESCE(${columnName}, '')), r'brasil|brazil') THEN 'BR'
+      WHEN REGEXP_CONTAINS(LOWER(COALESCE(${columnName}, '')), r'chile') THEN 'CL'
+      WHEN REGEXP_CONTAINS(LOWER(COALESCE(${columnName}, '')), r'colombi') THEN 'CO'
+      WHEN REGEXP_CONTAINS(LOWER(COALESCE(${columnName}, '')), r'costa[ _-]?rica|costarica| cri') THEN 'CR'
+      WHEN REGEXP_CONTAINS(LOWER(COALESCE(${columnName}, '')), r'ecuador') THEN 'EC'
       WHEN REGEXP_CONTAINS(LOWER(COALESCE(${columnName}, '')), r'peru|perú') THEN 'Peru'
       WHEN REGEXP_CONTAINS(LOWER(COALESCE(${columnName}, '')), r'espana|españa|spain|corporativ') THEN 'Espana'
-      WHEN REGEXP_CONTAINS(LOWER(COALESCE(${columnName}, '')), r'paraguay|paragua') THEN 'Paraguay'
-      WHEN REGEXP_CONTAINS(LOWER(COALESCE(${columnName}, '')), r'chile') THEN 'Chile'
-      WHEN REGEXP_CONTAINS(LOWER(COALESCE(${columnName}, '')), r'portug') THEN 'Portugal'
-      WHEN REGEXP_CONTAINS(LOWER(COALESCE(${columnName}, '')), r'alemania|aleman|germany|deutschland|german') THEN 'Alemania'
+      WHEN REGEXP_CONTAINS(LOWER(COALESCE(${columnName}, '')), r'guatemala') THEN 'GT'
+      WHEN REGEXP_CONTAINS(LOWER(COALESCE(${columnName}, '')), r'honduras') THEN 'HN'
+      WHEN REGEXP_CONTAINS(LOWER(COALESCE(${columnName}, '')), r'mexico|mex|m[eÃ©]xico') THEN 'MX'
+      WHEN REGEXP_CONTAINS(LOWER(COALESCE(${columnName}, '')), r'paraguay|paragua') THEN 'PY'
+      WHEN REGEXP_CONTAINS(LOWER(COALESCE(${columnName}, '')), r'peru|per') THEN 'PE'
+      WHEN REGEXP_CONTAINS(LOWER(COALESCE(${columnName}, '')), r'portug') THEN 'PT'
+      WHEN REGEXP_CONTAINS(LOWER(COALESCE(${columnName}, '')), r'uruguay') THEN 'UY'
+      WHEN REGEXP_CONTAINS(LOWER(COALESCE(${columnName}, '')), r'alemania|aleman|germany|deutschland|german') THEN 'DE'
       ELSE 'Other'
     END
   `;

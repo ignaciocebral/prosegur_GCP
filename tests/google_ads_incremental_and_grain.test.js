@@ -5,7 +5,8 @@ const path = require("path");
 const {
   parseGoogleAdsCustomerId,
   buildGoogleAdsIncrementalDateCheckpointSql,
-  buildUnifiedCampaignMartIncrementalDateCheckpointSql
+  buildUnifiedCampaignMartIncrementalDateCheckpointSql,
+  buildCountryCodeFromNameSql
 } = require("../includes/custom/marketing_helpers.js");
 const {
   buildGoogleAdsConversionBucketSql,
@@ -25,10 +26,47 @@ const clickMappingSql = fs.readFileSync(
   path.join(__dirname, "..", "definitions", "custom", "02_intermediate", "src_google_ads_click_mapping.sqlx"),
   "utf8"
 );
+const sessionKeysSql = fs.readFileSync(
+  path.join(__dirname, "..", "definitions", "custom", "02_intermediate", "stg_ga4_session_keys.sqlx"),
+  "utf8"
+);
+const metaAdsSql = fs.readFileSync(
+  path.join(__dirname, "..", "definitions", "custom", "02_intermediate", "src_meta_ads_ad_daily.sqlx"),
+  "utf8"
+);
 
 assert.strictEqual(parseGoogleAdsCustomerId("0"), 0);
 assert.strictEqual(parseGoogleAdsCustomerId("1703013237"), 1703013237);
 assert.strictEqual(parseGoogleAdsCustomerId("not-a-number"), 0);
+
+const countryCodeSql = buildCountryCodeFromNameSql("account_name");
+
+assert.ok(
+  countryCodeSql.includes("THEN 'ES'") &&
+    countryCodeSql.includes("THEN 'BR'") &&
+    countryCodeSql.includes("THEN 'MX'") &&
+    !countryCodeSql.includes("THEN 'Espana'") &&
+    !countryCodeSql.includes("THEN 'Brasil'"),
+  "Marketing country_code should use the ISO codes published in dim_seo_insights_source_mapping."
+);
+
+assert.ok(
+  customerLookupSql.includes("country_code") &&
+    campaignPerformanceBaseSql.includes("dim_seo_insights_source_mapping") &&
+    campaignPerformanceBaseSql.includes("ga4_output_dataset") &&
+    campaignPerformanceBaseSql.includes("release_country") &&
+    clickMappingSql.includes("acc.country_code IN") &&
+    metaAdsSql.includes("COALESCE(al.country_code, 'Other') IN"),
+  "Paid-media staging and campaign marts should filter rows to the release country from dim_seo_insights_source_mapping."
+);
+
+assert.ok(
+  sessionKeysSql.includes("buildCountryCodeFromNameSql(\"s.geo.country\")") &&
+    sessionKeysSql.includes("AS country_code") &&
+    sessionKeysSql.includes("dim_seo_insights_source_mapping") &&
+    sessionKeysSql.includes("ga4_output_dataset"),
+  "GA4 session staging should derive ISO country_code from geo.country and filter to the mapped release country."
+);
 
 const checkpointSqlWhenDisabled = buildGoogleAdsIncrementalDateCheckpointSql(
   "`project.dataset.some_table`",
