@@ -113,13 +113,16 @@ const cashEcGa4Scope = ga4DailySql.match(/WITH qualifying_sessions_Cash_EC AS \(
 const cashBrGa4Scope = ga4DailySql.match(/WITH qualifying_sessions_Cash_BR AS \([\s\S]*?\n  \)\n  SELECT/)[0];
 
 assert.ok(
-  cashEsGa4Scope.includes("REGEXP_CONTAINS(LOWER(COALESCE(e.page.location, ''))") &&
-    cashPtGa4Scope.includes("REGEXP_CONTAINS(LOWER(COALESCE(e.page.location, ''))") &&
-    cashEcGa4Scope.includes("REGEXP_CONTAINS(LOWER(COALESCE(e.page.location, ''))") &&
-    !cashEsGa4Scope.includes("event_params_custom.BusinessType") &&
-    !cashPtGa4Scope.includes("event_params_custom.BusinessType") &&
-    !cashEcGa4Scope.includes("event_params_custom.BusinessType"),
-  "GA4 markets with a URL regex should scope sessions by URL instead of also requiring BusinessType."
+  cashEsGa4Scope.includes("event_params_custom.BusinessType") &&
+    cashPtGa4Scope.includes("event_params_custom.BusinessType") &&
+    cashEcGa4Scope.includes("event_params_custom.BusinessType") &&
+    !cashEsGa4Scope.includes("gscUrlIncludeRegex") &&
+    !cashPtGa4Scope.includes("gscUrlIncludeRegex") &&
+    !cashEcGa4Scope.includes("gscUrlIncludeRegex") &&
+    !cashEsGa4Scope.includes("prosegur\\\\.es") &&
+    !cashPtGa4Scope.includes("prosegur\\\\.pt") &&
+    !cashEcGa4Scope.includes("prosegur\\\\.ec"),
+  "Search Console URL regexes should not replace GA4 BusinessType scoping."
 );
 
 assert.ok(
