@@ -92,16 +92,33 @@ assert.ok(
   "Cash PT should expose a market-level Search Console URL scope."
 );
 
+assert.ok(
+  filterSpecsSql
+    .split("\nUNION ALL\n")
+    .find((row) => row.includes("'Seg BR' AS market"))
+    .includes(
+      "'^https?://(www\\\\\\\\.)?segurpro\\\\\\\\.com\\\\\\\\.br/(?:(?:pequenos-medios-negocios(?:/filiais(?:/.*)?)?|grandes-negocios)|blog/seguranca)(?:/|$)' AS gsc_url_include_regex"
+    ) &&
+    filterSpecsSql
+      .split("\nUNION ALL\n")
+      .find((row) => row.includes("'Seg BR' AS market"))
+      .includes("'market_scope' AS gsc_scope_status"),
+  "Seg BR should expose a market-level Search Console URL scope for SegurPro."
+);
+
 const ga4DailySql = seoInsights.buildGa4DailySql();
 const cashEsGa4Scope = ga4DailySql.match(/WITH qualifying_sessions_Cash_ES AS \([\s\S]*?\n  \)\n  SELECT/)[0];
 const cashPtGa4Scope = ga4DailySql.match(/WITH qualifying_sessions_Cash_PT AS \([\s\S]*?\n  \)\n  SELECT/)[0];
+const segBrGa4Scope = ga4DailySql.match(/WITH qualifying_sessions_Seg_BR AS \([\s\S]*?\n  \)\n  SELECT/)[0];
 const cashBrGa4Scope = ga4DailySql.match(/WITH qualifying_sessions_Cash_BR AS \([\s\S]*?\n  \)\n  SELECT/)[0];
 
 assert.ok(
   cashEsGa4Scope.includes("REGEXP_CONTAINS(LOWER(COALESCE(e.page.location, ''))") &&
     cashPtGa4Scope.includes("REGEXP_CONTAINS(LOWER(COALESCE(e.page.location, ''))") &&
+    segBrGa4Scope.includes("REGEXP_CONTAINS(LOWER(COALESCE(e.page.location, ''))") &&
     !cashEsGa4Scope.includes("event_params_custom.BusinessType") &&
-    !cashPtGa4Scope.includes("event_params_custom.BusinessType"),
+    !cashPtGa4Scope.includes("event_params_custom.BusinessType") &&
+    !segBrGa4Scope.includes("event_params_custom.BusinessType"),
   "GA4 markets with a URL regex should scope sessions by URL instead of also requiring BusinessType."
 );
 
