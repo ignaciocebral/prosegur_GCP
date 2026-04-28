@@ -109,6 +109,20 @@ assert.ok(
 assert.ok(
   filterSpecsSql
     .split("\nUNION ALL\n")
+    .find((row) => row.includes("'Cash BR' AS market"))
+    .includes(
+      "'^https?://(www\\\\.)?prosegur\\\\.com\\\\.br/(?:(?:pequenos-medios-negocios|grandes-empresas)|blog/dinheiro)(?:/|$)' AS gsc_url_include_regex"
+    ) &&
+    filterSpecsSql
+      .split("\nUNION ALL\n")
+      .find((row) => row.includes("'Cash BR' AS market"))
+      .includes("'market_scope' AS gsc_scope_status"),
+  "Cash BR should expose a market-level Search Console URL scope."
+);
+
+assert.ok(
+  filterSpecsSql
+    .split("\nUNION ALL\n")
     .find((row) => row.includes("'Cash EC' AS market"))
     .includes(
       "'^https?://(www\\\\.)?prosegur\\\\.ec/(?:(?:negocios|servicios)|blog/efectivo)(?:/|$)' AS gsc_url_include_regex"
@@ -141,27 +155,31 @@ const cashPtGa4Scope = ga4DailySql.match(/WITH qualifying_sessions_Cash_PT AS \(
 const segBrGa4Scope = ga4DailySql.match(/WITH qualifying_sessions_Seg_BR AS \([\s\S]*?\n  \)\n  SELECT/)[0];
 const cashEcGa4Scope = ga4DailySql.match(/WITH qualifying_sessions_Cash_EC AS \([\s\S]*?\n  \)\n  SELECT/)[0];
 const cashBrGa4Scope = ga4DailySql.match(/WITH qualifying_sessions_Cash_BR AS \([\s\S]*?\n  \)\n  SELECT/)[0];
+const cashUyGa4Scope = ga4DailySql.match(/WITH qualifying_sessions_Cash_UY AS \([\s\S]*?\n  \)\n  SELECT/)[0];
 
 assert.ok(
   cashEsGa4Scope.includes("event_params_custom.BusinessType") &&
     cashArGa4Scope.includes("event_params_custom.BusinessType") &&
     cashPtGa4Scope.includes("event_params_custom.BusinessType") &&
     cashEcGa4Scope.includes("event_params_custom.BusinessType") &&
+    cashBrGa4Scope.includes("event_params_custom.BusinessType") &&
     !cashEsGa4Scope.includes("gscUrlIncludeRegex") &&
     !cashArGa4Scope.includes("gscUrlIncludeRegex") &&
     !cashPtGa4Scope.includes("gscUrlIncludeRegex") &&
     !cashEcGa4Scope.includes("gscUrlIncludeRegex") &&
+    !cashBrGa4Scope.includes("gscUrlIncludeRegex") &&
     !cashEsGa4Scope.includes("prosegur\\\\.es") &&
     !cashArGa4Scope.includes("prosegur\\\\.com\\\\.ar") &&
     !cashPtGa4Scope.includes("prosegur\\\\.pt") &&
     !cashEcGa4Scope.includes("prosegur\\\\.ec") &&
+    !cashBrGa4Scope.includes("prosegur\\\\.com\\\\.br") &&
     !segBrGa4Scope.includes("segurpro\\\\.com"),
   "Search Console URL regexes should not replace GA4 BusinessType scoping."
 );
 
 assert.ok(
-  cashBrGa4Scope.includes("event_params_custom.BusinessType") && !cashBrGa4Scope.includes("e.page.location"),
-  "GA4 markets without a URL regex should fall back to BusinessType scoping."
+  cashUyGa4Scope.includes("event_params_custom.BusinessType") && !cashUyGa4Scope.includes("e.page.location"),
+  "GA4 markets without page filters should use BusinessType scoping."
 );
 
 console.log("seo insights config regression tests passed");
