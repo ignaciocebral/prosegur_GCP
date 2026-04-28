@@ -213,6 +213,8 @@ const GA4_MARKETS = [
     trafficScope: "organic_search",
     businessTypeIncludeRegex: "(^cash$|cash today)",
     businessTypeExcludeRegex: "(combine|corporate|alarm|avos|rrhh|security|cipher)",
+    gscUrlIncludeRegex:
+      "^https?://(www\\.)?prosegur\\.ec/(?:(?:negocios|servicios)|blog/efectivo)(?:/|$)",
     hostnameInclude: [],
     hostnameExclude: DEFAULT_HOSTNAME_EXCLUDE,
     pageIncludeRegex: null,
@@ -1051,11 +1053,7 @@ function buildSourceMappingDimSql() {
 function ga4BusinessFilter(alias, market) {
   const clauses = [`${alias}.session_id IS NOT NULL`];
 
-  if (market.gscUrlIncludeRegex) {
-    clauses.push(
-      `REGEXP_CONTAINS(LOWER(COALESCE(${alias}.page.location, '')), ${sqlString(market.gscUrlIncludeRegex)})`
-    );
-  } else {
+  if (market.businessTypeIncludeRegex) {
     clauses.push(
       `REGEXP_CONTAINS(LOWER(TRIM(COALESCE(${alias}.event_params_custom.BusinessType, ''))), ${sqlString(
         market.businessTypeIncludeRegex
@@ -1063,11 +1061,7 @@ function ga4BusinessFilter(alias, market) {
     );
   }
 
-  if (market.gscUrlIncludeRegex && market.gscUrlExcludeRegex) {
-    clauses.push(
-      `NOT REGEXP_CONTAINS(LOWER(COALESCE(${alias}.page.location, '')), ${sqlString(market.gscUrlExcludeRegex)})`
-    );
-  } else if (!market.gscUrlIncludeRegex && market.businessTypeExcludeRegex) {
+  if (market.businessTypeExcludeRegex) {
     clauses.push(
       `NOT REGEXP_CONTAINS(LOWER(TRIM(COALESCE(${alias}.event_params_custom.BusinessType, ''))), ${sqlString(
         market.businessTypeExcludeRegex
