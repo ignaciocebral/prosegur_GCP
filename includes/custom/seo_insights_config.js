@@ -306,6 +306,8 @@ const GA4_MARKETS = [
     businessTypeIncludeRegex:
       "(^security$|seguridad|isoc|hybrid|vigilancia|proteccion contra incendios|ojo del halcon)",
     businessTypeExcludeRegex: "(combine|corporate|alarm|cash|avos|rrhh)",
+    gscUrlIncludeRegex:
+      "^https?://(www\\.)?prosegur\\.com\\.ar/(?:(?:negocios-pymes|empresas-instituciones)/seguridad(?:/filiales(?:/.*)?)?|blog/seguridad)(?:/|$)",
     hostnameInclude: [],
     hostnameExclude: DEFAULT_HOSTNAME_EXCLUDE,
     pageIncludeRegex: null,
