@@ -123,6 +123,20 @@ assert.ok(
 assert.ok(
   filterSpecsSql
     .split("\nUNION ALL\n")
+    .find((row) => row.includes("'Seg CO' AS market"))
+    .includes(
+      "'^https?://(www\\\\.)?prosegur\\\\.com\\\\.co/(?:(?:negocios/seguridad(?:/sucursales(?:/.*)?)?|empresas/seguridad))(?:/|$)' AS gsc_url_include_regex"
+    ) &&
+    filterSpecsSql
+      .split("\nUNION ALL\n")
+      .find((row) => row.includes("'Seg CO' AS market"))
+      .includes("'market_scope' AS gsc_scope_status"),
+  "Security CO should expose a market-level Search Console URL scope."
+);
+
+assert.ok(
+  filterSpecsSql
+    .split("\nUNION ALL\n")
     .find((row) => row.includes("'Seg AR' AS market"))
     .includes(
       "'^https?://(www\\\\.)?prosegur\\\\.com\\\\.ar/(?:(?:negocios-pymes|empresas-instituciones)/seguridad(?:/filiales(?:/.*)?)?|blog/seguridad)(?:/|$)' AS gsc_url_include_regex"
@@ -211,6 +225,7 @@ const cashCoGa4Scope = ga4DailySql.match(/WITH qualifying_sessions_Cash_CO AS \(
 const cashPtGa4Scope = ga4DailySql.match(/WITH qualifying_sessions_Cash_PT AS \([\s\S]*?\n  \)\n  SELECT/)[0];
 const cashClGa4Scope = ga4DailySql.match(/WITH qualifying_sessions_Cash_CL AS \([\s\S]*?\n  \)\n  SELECT/)[0];
 const segArGa4Scope = ga4DailySql.match(/WITH qualifying_sessions_Seg_AR AS \([\s\S]*?\n  \)\n  SELECT/)[0];
+const segCoGa4Scope = ga4DailySql.match(/WITH qualifying_sessions_Seg_CO AS \([\s\S]*?\n  \)\n  SELECT/)[0];
 const segEsGa4Scope = ga4DailySql.match(/WITH qualifying_sessions_Seg_ES AS \([\s\S]*?\n  \)\n  SELECT/)[0];
 const segBrGa4Scope = ga4DailySql.match(/WITH qualifying_sessions_Seg_BR AS \([\s\S]*?\n  \)\n  SELECT/)[0];
 const cashEcGa4Scope = ga4DailySql.match(/WITH qualifying_sessions_Cash_EC AS \([\s\S]*?\n  \)\n  SELECT/)[0];
@@ -224,6 +239,7 @@ assert.ok(
     cashPtGa4Scope.includes("event_params_custom.BusinessType") &&
     cashClGa4Scope.includes("event_params_custom.BusinessType") &&
     segArGa4Scope.includes("event_params_custom.BusinessType") &&
+    segCoGa4Scope.includes("event_params_custom.BusinessType") &&
     segEsGa4Scope.includes("event_params_custom.BusinessType") &&
     cashEcGa4Scope.includes("event_params_custom.BusinessType") &&
     cashBrGa4Scope.includes("event_params_custom.BusinessType") &&
@@ -233,6 +249,7 @@ assert.ok(
     !cashPtGa4Scope.includes("gscUrlIncludeRegex") &&
     !cashClGa4Scope.includes("gscUrlIncludeRegex") &&
     !segArGa4Scope.includes("gscUrlIncludeRegex") &&
+    !segCoGa4Scope.includes("gscUrlIncludeRegex") &&
     !segEsGa4Scope.includes("gscUrlIncludeRegex") &&
     !cashEcGa4Scope.includes("gscUrlIncludeRegex") &&
     !cashBrGa4Scope.includes("gscUrlIncludeRegex") &&
@@ -242,6 +259,7 @@ assert.ok(
     !cashPtGa4Scope.includes("prosegur\\\\.pt") &&
     !cashClGa4Scope.includes("prosegur\\\\.cl") &&
     !segArGa4Scope.includes("blog/seguridad") &&
+    !segCoGa4Scope.includes("prosegur\\\\.com\\\\.co") &&
     !segEsGa4Scope.includes("blog/seguridad") &&
     !cashEcGa4Scope.includes("prosegur\\\\.ec") &&
     !cashBrGa4Scope.includes("prosegur\\\\.com\\\\.br") &&
