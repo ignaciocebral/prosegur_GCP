@@ -283,6 +283,8 @@ const GA4_MARKETS = [
     trafficScope: "organic_search",
     businessTypeIncludeRegex: "^security( \\(.+\\))?$",
     businessTypeExcludeRegex: "(combine|alarm|cash|avos|rrhh|cipher)",
+    gscUrlIncludeRegex:
+      "^https?://(www\\.)?prosegur\\.es/(?:(?:negocios-y-pymes|empresas)/seguridad(?:/delegaciones(?:/.*)?)?|blog/seguridad)(?:/|$)",
     hostnameInclude: [],
     hostnameExclude: DEFAULT_HOSTNAME_EXCLUDE,
     pageIncludeRegex: null,
