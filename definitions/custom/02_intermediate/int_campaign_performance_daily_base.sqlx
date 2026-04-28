@@ -34,7 +34,20 @@ pre_operations {
   declare date_checkpoint DATE;
   set date_checkpoint = (
     ${when(incremental(),
-      dateCheckpointSql,
+      `SELECT
+        CASE
+          WHEN EXISTS (
+            SELECT 1
+            FROM ${self()}
+            WHERE country_code IS NULL
+              OR country_code NOT IN (
+                SELECT DISTINCT country_code
+                FROM ${ref("dim_seo_insights_source_mapping")}
+                WHERE ga4_output_dataset = '${dataform.projectConfig.vars.OUTPUTS_DATASET}'
+              )
+          ) THEN DATE('2020-01-01')
+          ELSE (${dateCheckpointSql})
+        END`,
       `SELECT DATE('2020-01-01')`
     )}
   );
@@ -43,7 +56,13 @@ pre_operations {
   )}
 }
 
-WITH google_ads_raw AS (
+WITH release_country AS (
+  SELECT ANY_VALUE(country_code) AS country_code
+  FROM ${ref("dim_seo_insights_source_mapping")}
+  WHERE ga4_output_dataset = '${dataform.projectConfig.vars.OUTPUTS_DATASET}'
+),
+
+google_ads_raw AS (
   SELECT
     date,
     'google_ads' AS platform,
@@ -69,6 +88,7 @@ WITH google_ads_raw AS (
     conversions_value_total AS platform_conversions_value
   FROM ${ref("src_google_ads_performance")}
   WHERE date >= date_checkpoint
+    AND country_code IN (SELECT country_code FROM release_country)
 ),
 
 google_ads AS (
@@ -127,6 +147,7 @@ meta_ads_raw AS (
     CAST(0 AS FLOAT64) AS platform_conversions_value
   FROM ${ref("src_meta_ads_ad_daily")}
   WHERE date >= date_checkpoint
+    AND country_code IN (SELECT country_code FROM release_country)
 ),
 
 meta_ads AS (
@@ -229,7 +250,7 @@ joined AS (
     COALESCE(ad.platform, s.platform, c.platform) AS platform,
     COALESCE(ad.campaign_id, s.campaign_id, c.campaign_id) AS campaign_id,
     COALESCE(ad.ad_group_or_adset_id, s.ad_group_or_adset_id, c.ad_group_or_adset_id) AS ad_group_or_adset_id,
-    ad.country_code,
+    COALESCE(ad.country_code, (SELECT country_code FROM release_country)) AS country_code,
     ad.account_id,
     ad.account_name,
     ad.campaign_name,

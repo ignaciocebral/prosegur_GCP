@@ -1,0 +1,15 @@
+config {
+  type: "assertion",
+  schema: dataform.projectConfig.vars.QUALITY_DATASET,
+  tags: [dataform.projectConfig.vars.LABEL_EXECUTION_OPERATION, "quality", "country_isolation"],
+  description: "Fails when session attribution rows are not backed by the release-country-filtered GA4 session staging table."
+}
+
+SELECT
+  m.session_date,
+  COUNT(*) AS row_count
+FROM ${ref("mart_session_attribution_enriched")} m
+LEFT JOIN ${ref("stg_ga4_session_keys")} sk
+  ON m.session_id = sk.session_id
+WHERE sk.session_id IS NULL
+GROUP BY 1

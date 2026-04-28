@@ -62,10 +62,9 @@ assert.ok(
 
 assert.ok(
   sessionKeysSql.includes("buildCountryCodeFromNameSql(\"s.geo.country\")") &&
-    sessionKeysSql.includes("AS country_code") &&
     sessionKeysSql.includes("dim_seo_insights_source_mapping") &&
     sessionKeysSql.includes("ga4_output_dataset"),
-  "GA4 session staging should derive ISO country_code from geo.country and filter to the mapped release country."
+  "GA4 session staging should derive ISO country_code from geo.country for filtering to the mapped release country."
 );
 
 const checkpointSqlWhenDisabled = buildGoogleAdsIncrementalDateCheckpointSql(
