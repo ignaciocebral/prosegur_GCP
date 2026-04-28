@@ -88,6 +88,8 @@ const GA4_MARKETS = [
     businessTypeIncludeRegex:
       "(^cash$|cash today|logistica de valores|gestao de numerario|subhome|bancos|correspondente autorizado|transporte internacional|servicos|deposito diario|varejistas|cooperativas de credito|supermercados|postos de combustiveis|farmacia)",
     businessTypeExcludeRegex: "(combine|corporat|alarm|avos|rrhh|security|segurpro)",
+    gscUrlIncludeRegex:
+      "^https?://(www\\.)?prosegur\\.com\\.br/(?:(?:pequenos-medios-negocios|grandes-empresas)|blog/dinheiro)(?:/|$)",
     hostnameInclude: [],
     hostnameExclude: DEFAULT_HOSTNAME_EXCLUDE,
     pageIncludeRegex: null,
