@@ -298,8 +298,8 @@ assert.ok(
 );
 
 assert.ok(
-  mexicoGa4DailySql.includes("WHERE FALSE") &&
-    mexicoMappingSql.includes("WHERE FALSE") &&
+  mexicoGa4DailySql.includes("FROM UNNEST([]) AS _empty") &&
+    mexicoMappingSql.includes("FROM UNNEST([]) AS _empty") &&
     !mexicoGa4DailySql.includes("'ES' AS country_code") &&
     !mexicoGa4DailySql.includes("'AR' AS country_code"),
   "Mapped output datasets without SEO market definitions should compile empty instead of leaking another country."

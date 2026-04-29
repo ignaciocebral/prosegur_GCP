@@ -972,7 +972,7 @@ SELECT
   CAST(NULL AS STRING) AS source_system,
   FALSE AS export_to_master,
   CAST(NULL AS STRING) AS notes
-WHERE FALSE
+FROM UNNEST([]) AS _empty
 `;
 }
 
@@ -1035,7 +1035,7 @@ SELECT
   CAST(NULL AS STRING) AS gsc_url_include_regex,
   CAST(NULL AS STRING) AS gsc_url_exclude_regex,
   CAST(NULL AS STRING) AS gsc_scope_status
-WHERE FALSE
+FROM UNNEST([]) AS _empty
 `;
 }
 
@@ -1129,7 +1129,7 @@ SELECT
   CAST(NULL AS STRING) AS gsc_scope_status,
   CAST(NULL AS STRING) AS filter_validation_status,
   FALSE AS export_to_master
-WHERE FALSE
+FROM UNNEST([]) AS _empty
 `;
 }
 
@@ -1315,7 +1315,7 @@ SELECT
   ${sqlString(kpi)} AS kpi,
   0 AS metric_value,
   ${sqlString(sourceDetail)} AS source_detail
-WHERE FALSE
+FROM UNNEST([]) AS _empty
 `;
 }
 
