@@ -22,6 +22,7 @@ js {
       )
       OR REGEXP_CONTAINS(LOWER(e.event_name), r'c2c')
       OR e.event_name = 'generate_lead'
+      OR LOWER(e.event_name) = 'generate_lead_crm'
     )
   `;
 }
@@ -91,7 +92,8 @@ lead_events AS (
     REGEXP_CONTAINS(LOWER(e.event_name), r"form")
       AND NOT REGEXP_CONTAINS(LOWER(e.event_name), r"formulario") AS is_form,
     REGEXP_CONTAINS(LOWER(e.event_name), r"c2c") AS is_c2c,
-    e.event_name = "generate_lead" AS is_generate_lead
+    e.event_name = "generate_lead"
+      OR LOWER(e.event_name) = "generate_lead_crm" AS is_generate_lead
   FROM ${ref("ga4_events")} e
   LEFT JOIN ${ref("ga4_sessions")} s
     ON e.session_id = s.session_id
