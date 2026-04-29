@@ -219,6 +219,8 @@ assert.ok(
 );
 
 const ga4DailySql = seoInsights.buildGa4DailySql();
+const spainGa4DailySql = seoInsights.buildGa4DailySql({ outputDataset: "superform_outputs_286664974" });
+const spainCoverageSql = seoInsights.buildCoverageMatrixSql({ outputDataset: "superform_outputs_286664974" });
 const cashEsGa4Scope = ga4DailySql.match(/WITH qualifying_sessions_Cash_ES AS \([\s\S]*?\n  \)\n  SELECT/)[0];
 const cashArGa4Scope = ga4DailySql.match(/WITH qualifying_sessions_Cash_AR AS \([\s\S]*?\n  \)\n  SELECT/)[0];
 const cashCoGa4Scope = ga4DailySql.match(/WITH qualifying_sessions_Cash_CO AS \([\s\S]*?\n  \)\n  SELECT/)[0];
@@ -270,6 +272,27 @@ assert.ok(
 assert.ok(
   cashUyGa4Scope.includes("event_params_custom.BusinessType") && !cashUyGa4Scope.includes("e.page.location"),
   "GA4 markets without page filters should use BusinessType scoping."
+);
+
+assert.ok(
+  spainGa4DailySql.includes("'ES' AS country_code") &&
+    spainGa4DailySql.includes("'Cash ES' AS market") &&
+    spainGa4DailySql.includes("'Seg ES' AS market") &&
+    spainGa4DailySql.includes("'Talento ES' AS market") &&
+    spainGa4DailySql.includes("'Avos Tech ES' AS market"),
+  "Spain-scoped SEO GA4 daily SQL should include only Spain markets for the Spain output dataset."
+);
+
+assert.ok(
+  !spainGa4DailySql.includes("'AR' AS country_code") &&
+    !spainGa4DailySql.includes("'BR' AS country_code") &&
+    !spainGa4DailySql.includes("'CO' AS country_code") &&
+    !spainGa4DailySql.includes("'PT' AS country_code") &&
+    !spainCoverageSql.includes("'AR' AS country_code") &&
+    !spainCoverageSql.includes("'BR' AS country_code") &&
+    !spainCoverageSql.includes("'CO' AS country_code") &&
+    !spainCoverageSql.includes("'PT' AS country_code"),
+  "SEO outputs scoped to superform_outputs_286664974 must not emit non-Spain country codes."
 );
 
 console.log("seo insights config regression tests passed");

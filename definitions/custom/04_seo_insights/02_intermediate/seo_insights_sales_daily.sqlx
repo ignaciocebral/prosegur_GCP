@@ -26,4 +26,7 @@ pre_operations {
   )}
 }
 
-${seoInsights.buildSalesDailySql({ dateLowerBoundExpression: "date_checkpoint" })}
+${seoInsights.buildSalesDailySql({
+  dateLowerBoundExpression: "date_checkpoint",
+  outputDataset: dataform.projectConfig.vars.OUTPUTS_DATASET
+})}

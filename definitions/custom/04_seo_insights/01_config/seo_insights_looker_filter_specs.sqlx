@@ -9,4 +9,4 @@ js {
   const seoInsights = require("includes/custom/seo_insights_config");
 }
 
-${seoInsights.buildFilterSpecsSql()}
+${seoInsights.buildFilterSpecsSql({ outputDataset: dataform.projectConfig.vars.OUTPUTS_DATASET })}

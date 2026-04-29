@@ -9,5 +9,4 @@ js {
   const seoInsights = require("includes/custom/seo_insights_config");
 }
 
-${seoInsights.buildSourceMappingDimSql()}
-
+${seoInsights.buildSourceMappingDimSql({ outputDataset: dataform.projectConfig.vars.OUTPUTS_DATASET })}

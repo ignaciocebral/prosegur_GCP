@@ -854,6 +854,20 @@ function resolveDateLowerBoundExpression(dateLowerBoundExpression) {
   return dateLowerBoundExpression || `DATE('${SOURCE_START_DATE}')`;
 }
 
+function resolveMarkets(options = {}) {
+  if (!options.outputDataset) {
+    return GA4_MARKETS;
+  }
+  const markets = GA4_MARKETS.filter((market) => market.outputDataset === options.outputDataset);
+  if (markets.length > 0) {
+    return markets;
+  }
+  if (String(options.outputDataset).includes("example")) {
+    return GA4_MARKETS;
+  }
+  return markets;
+}
+
 function findSalesSource(market) {
   return SALES_SOURCE_CONFIGS.find((item) => item.market === market) || null;
 }
@@ -946,9 +960,9 @@ function coverageSourceSystem(market, kpiKey) {
   return "not_available";
 }
 
-function buildCoverageMatrixSql() {
+function buildCoverageMatrixSql(options = {}) {
   const rows = [];
-  for (const market of GA4_MARKETS) {
+  for (const market of resolveMarkets(options)) {
     for (const kpiKey of KPI_KEYS) {
       rows.push(
         [
@@ -968,8 +982,8 @@ function buildCoverageMatrixSql() {
   return rows.join("\nUNION ALL\n");
 }
 
-function buildFilterSpecsSql() {
-  const rows = GA4_MARKETS.map((market) => {
+function buildFilterSpecsSql(options = {}) {
+  const rows = resolveMarkets(options).map((market) => {
     const salesSource = findSalesSource(market.market);
     const qualifiedDefinition = hasQualifiedLeads(market)
       ? `COUNTIF(is_qualified = 1) from ${market.businessLine === "security" ? "cc_gold.cc_leads_security" : "cc_gold.cc_leads_master (final_product=CASH)"} using management_end_date and channel = organic.`
@@ -1030,8 +1044,8 @@ function buildFilterSpecsSql() {
   return rows.join("\nUNION ALL\n");
 }
 
-function buildSourceMappingDimSql() {
-  const rows = GA4_MARKETS.map((market) => {
+function buildSourceMappingDimSql(options = {}) {
+  const rows = resolveMarkets(options).map((market) => {
     const mapping = PROPERTY_SOURCE_MAPPINGS[market.outputDataset] || {};
     const ga4Dataset = mapping.ga4Dataset || `analytics_${propertyIdFromOutputDataset(market.outputDataset)}`;
     const ga4PropertyId = propertyIdFromOutputDataset(ga4Dataset);
@@ -1136,7 +1150,7 @@ function buildGa4DailySql(options = {}) {
   const dateLowerBoundExpression = resolveDateLowerBoundExpression(options.dateLowerBoundExpression);
   const parts = [];
 
-  for (const market of GA4_MARKETS) {
+  for (const market of resolveMarkets(options)) {
     const sessionScopeName = `qualifying_sessions_${escapeIdentifier(market.market)}`;
     const baseSelect = [
       `${sqlString(FILTERS_VERSION)} AS filters_version`,
@@ -1196,7 +1210,7 @@ function buildCcDailySql(options = {}) {
   const dateLowerBoundExpression = resolveDateLowerBoundExpression(options.dateLowerBoundExpression);
   const parts = [];
 
-  for (const market of GA4_MARKETS) {
+  for (const market of resolveMarkets(options)) {
     if (!hasQualifiedLeads(market)) {
       continue;
     }
@@ -1257,8 +1271,13 @@ WHERE FALSE
 function buildSalesDailySql(options = {}) {
   const dateLowerBoundExpression = resolveDateLowerBoundExpression(options.dateLowerBoundExpression);
   const parts = [];
+  const allowedMarkets = new Set(resolveMarkets(options).map((market) => market.market));
 
   for (const source of SALES_SOURCE_CONFIGS) {
+    if (!allowedMarkets.has(source.market)) {
+      continue;
+    }
+
     const commonColumns = [
       `${sqlString(FILTERS_VERSION)} AS filters_version`,
       `${sqlString(source.businessLine)} AS business_line`,
@@ -1321,7 +1340,7 @@ function buildGscDailySql(options = {}) {
   const dateLowerBoundExpression = resolveDateLowerBoundExpression(options.dateLowerBoundExpression);
   const parts = [];
 
-  for (const market of GA4_MARKETS) {
+  for (const market of resolveMarkets(options)) {
     const dataset = gscDatasetForMarket(market);
     const sourceSystem = `${dataset}.searchdata_url_impression`;
     const hasUrlScope = hasGscUrlScope(market);

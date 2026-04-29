@@ -9,4 +9,4 @@ js {
   const seoInsights = require("includes/custom/seo_insights_config");
 }
 
-${seoInsights.buildCoverageMatrixSql()}
+${seoInsights.buildCoverageMatrixSql({ outputDataset: dataform.projectConfig.vars.OUTPUTS_DATASET })}
