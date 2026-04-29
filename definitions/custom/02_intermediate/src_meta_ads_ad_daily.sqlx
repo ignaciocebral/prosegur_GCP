@@ -36,7 +36,20 @@ pre_operations {
   declare date_checkpoint DATE;
   set date_checkpoint = (
     ${when(incremental(),
-      buildMetaIncrementalDateCheckpointSql(self(), metaAccountNamesRaw, "ad_account_name", "date"),
+      `SELECT
+        CASE
+          WHEN EXISTS (
+            SELECT 1
+            FROM ${self()}
+            WHERE country_code IS NULL
+              OR country_code NOT IN (
+                SELECT DISTINCT country_code
+                FROM ${ref("dim_seo_insights_source_mapping")}
+                WHERE ga4_output_dataset = '${dataform.projectConfig.vars.OUTPUTS_DATASET}'
+              )
+          ) THEN DATE('2020-01-01')
+          ELSE (${buildMetaIncrementalDateCheckpointSql(self(), metaAccountNamesRaw, "ad_account_name", "date")})
+        END`,
       `SELECT DATE('2020-01-01')`
     )}
   );
@@ -96,4 +109,9 @@ WHERE ai.campaign_id IS NOT NULL
   AND ai.date IS NOT NULL
   AND ai.ad_id IS NOT NULL
   AND ai.date >= date_checkpoint
+  AND COALESCE(al.country_code, 'Other') IN (
+    SELECT DISTINCT country_code
+    FROM ${ref("dim_seo_insights_source_mapping")}
+    WHERE ga4_output_dataset = '${dataform.projectConfig.vars.OUTPUTS_DATASET}'
+  )
   ${metaAccountFilterSql}

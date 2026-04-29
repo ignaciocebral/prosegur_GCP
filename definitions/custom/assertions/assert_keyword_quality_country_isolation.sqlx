@@ -1,0 +1,20 @@
+config {
+  type: "assertion",
+  schema: dataform.projectConfig.vars.QUALITY_DATASET,
+  tags: [dataform.projectConfig.vars.LABEL_EXECUTION_OPERATION, "google_ads", "quality", "country_isolation"],
+  description: "Fails when keyword quality rows are materialized outside the country mapped to the current release config output dataset."
+}
+
+WITH release_country AS (
+  SELECT DISTINCT country_code
+  FROM ${ref("dim_seo_insights_source_mapping")}
+  WHERE ga4_output_dataset = '${dataform.projectConfig.vars.OUTPUTS_DATASET}'
+)
+
+SELECT
+  country_code,
+  COUNT(*) AS row_count
+FROM ${ref("mart_keyword_quality")}
+WHERE country_code IS NULL
+  OR country_code NOT IN (SELECT country_code FROM release_country)
+GROUP BY 1

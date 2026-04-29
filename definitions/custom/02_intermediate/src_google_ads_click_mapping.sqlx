@@ -80,3 +80,8 @@ LEFT JOIN
   ad_groups ag ON c.customer_id = ag.customer_id AND c.ad_group_id = ag.ad_group_id
 LEFT JOIN
   ${ref("src_google_ads_customer_lookup")} acc ON c.customer_id = acc.customer_id
+WHERE acc.country_code IN (
+  SELECT DISTINCT country_code
+  FROM ${ref("dim_seo_insights_source_mapping")}
+  WHERE ga4_output_dataset = '${dataform.projectConfig.vars.OUTPUTS_DATASET}'
+)

@@ -20,6 +20,11 @@ config {
   }
 }
 
+js {
+  const { buildCountryCodeFromNameSql } = require("includes/custom/marketing_helpers.js");
+  const sessionCountryCodeSql = buildCountryCodeFromNameSql("s.geo.country");
+}
+
 -- This block defines the incremental refresh window so only recent session keys are rebuilt each run.
 pre_operations {
   declare date_checkpoint DATE;
@@ -79,4 +84,9 @@ SELECT
   s.last_non_direct_traffic_source.default_channel_grouping AS lnd_default_channel_grouping
 FROM ${ref("ga4_sessions")} s
 WHERE s.session_date >= date_checkpoint
+  AND ${sessionCountryCodeSql} IN (
+    SELECT DISTINCT country_code
+    FROM ${ref("dim_seo_insights_source_mapping")}
+    WHERE ga4_output_dataset = '${dataform.projectConfig.vars.OUTPUTS_DATASET}'
+  )
 QUALIFY ROW_NUMBER() OVER (PARTITION BY s.session_id ORDER BY s.session_date DESC) = 1

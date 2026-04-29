@@ -1,0 +1,34 @@
+config {
+  type: "assertion",
+  schema: dataform.projectConfig.vars.QUALITY_DATASET,
+  tags: [dataform.projectConfig.vars.LABEL_EXECUTION_OPERATION, "quality", "country_isolation"],
+  description: "Fails when session attribution rows are materialized outside the country mapped to the current release config output dataset."
+}
+
+js {
+  const { buildCountryCodeFromNameSql } = require("includes/custom/marketing_helpers.js");
+  const sessionCountryCodeSql = buildCountryCodeFromNameSql("s.geo.country");
+}
+
+WITH release_country AS (
+  SELECT DISTINCT country_code
+  FROM ${ref("dim_seo_insights_source_mapping")}
+  WHERE ga4_output_dataset = '${dataform.projectConfig.vars.OUTPUTS_DATASET}'
+),
+
+session_rows AS (
+  SELECT
+    ${sessionCountryCodeSql} AS country_code
+  FROM ${ref("mart_session_attribution_enriched")} m
+  LEFT JOIN ${ref("ga4_sessions")} s
+    ON m.session_id = s.session_id
+    AND m.session_date = s.session_date
+)
+
+SELECT
+  country_code,
+  COUNT(*) AS row_count
+FROM session_rows
+WHERE country_code IS NULL
+  OR country_code NOT IN (SELECT country_code FROM release_country)
+GROUP BY 1

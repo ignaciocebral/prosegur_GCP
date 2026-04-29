@@ -13,7 +13,20 @@ pre_operations {
   declare date_checkpoint DATE;
   set date_checkpoint = (
     ${when(incremental(),
-      buildGoogleAdsIncrementalDateCheckpointSql(self(), googleAdsCustomerIdRaw, "customer_id", "date"),
+      `SELECT
+        CASE
+          WHEN EXISTS (
+            SELECT 1
+            FROM ${self()}
+            WHERE country_code IS NULL
+              OR country_code NOT IN (
+                SELECT DISTINCT country_code
+                FROM ${ref("dim_seo_insights_source_mapping")}
+                WHERE ga4_output_dataset = '${dataform.projectConfig.vars.OUTPUTS_DATASET}'
+              )
+          ) THEN DATE('2020-01-01')
+          ELSE (${buildGoogleAdsIncrementalDateCheckpointSql(self(), googleAdsCustomerIdRaw, "customer_id", "date")})
+        END`,
       `SELECT DATE('2020-01-01')`
     )}
   );
@@ -281,4 +294,8 @@ LEFT JOIN
   ON s.customer_id = ai.customer_id
   AND s.ad_group_id = ai.ad_group_id
   AND s.ad_id = ai.ad_id
-
+WHERE cust.country_code IN (
+  SELECT DISTINCT country_code
+  FROM ${ref("dim_seo_insights_source_mapping")}
+  WHERE ga4_output_dataset = '${dataform.projectConfig.vars.OUTPUTS_DATASET}'
+)
