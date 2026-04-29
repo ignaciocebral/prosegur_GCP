@@ -1,0 +1,25 @@
+config {
+  type: "assertion",
+  schema: dataform.projectConfig.vars.QUALITY_DATASET,
+  tags: [dataform.projectConfig.vars.LABEL_EXECUTION_OPERATION, "lead_bridge", "quality", "country_isolation"],
+  description: "Fails when GA4 lead bridge rows are materialized outside the country mapped to the current release config output dataset."
+}
+
+js {
+  const { buildCountryCodeFromNameSql } = require("includes/custom/marketing_helpers.js");
+  const leadCountryCodeSql = buildCountryCodeFromNameSql("country");
+}
+
+WITH release_country AS (
+  SELECT DISTINCT country_code
+  FROM ${ref("dim_seo_insights_source_mapping")}
+  WHERE ga4_output_dataset = '${dataform.projectConfig.vars.OUTPUTS_DATASET}'
+)
+
+SELECT
+  ${leadCountryCodeSql} AS country_code,
+  COUNT(*) AS row_count
+FROM ${ref("ga4_lead_event_bridge")}
+WHERE ${leadCountryCodeSql} IS NULL
+  OR ${leadCountryCodeSql} NOT IN (SELECT country_code FROM release_country)
+GROUP BY 1
