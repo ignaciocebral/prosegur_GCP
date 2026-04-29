@@ -195,7 +195,7 @@ ga4_sessions_by_campaign AS (
       CAST(s.paid_attribution.meta_ads.campaign_id AS STRING)
     ) AS campaign_id,
     COALESCE(
-      CAST(s.paid_attribution.google_ads.ad_group_id AS STRING),
+      NULLIF(CAST(s.paid_attribution.google_ads.ad_group_id AS STRING), '0'),
       CAST(s.paid_attribution.meta_ads.adset_id AS STRING)
     ) AS ad_group_or_adset_id,
     COUNT(DISTINCT s.session_id) AS ga4_sessions,
@@ -218,7 +218,7 @@ ga4_conversions_by_campaign AS (
       CAST(m.paid_attribution.meta_ads.campaign_id AS STRING)
     ) AS campaign_id,
     COALESCE(
-      CAST(m.paid_attribution.google_ads.ad_group_id AS STRING),
+      NULLIF(CAST(m.paid_attribution.google_ads.ad_group_id AS STRING), '0'),
       CAST(m.paid_attribution.meta_ads.adset_id AS STRING)
     ) AS ad_group_or_adset_id,
     COUNTIF(REGEXP_CONTAINS(LOWER(e.event_name), r'cmb')) AS ga4_conversions_cmb,

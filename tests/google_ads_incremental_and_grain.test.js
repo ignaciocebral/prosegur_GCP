@@ -34,6 +34,10 @@ const metaAdsSql = fs.readFileSync(
   path.join(__dirname, "..", "definitions", "custom", "02_intermediate", "src_meta_ads_ad_daily.sqlx"),
   "utf8"
 );
+const googleAdsIdentityAssertionSql = fs.readFileSync(
+  path.join(__dirname, "..", "definitions", "custom", "assertions", "assert_mart_campaign_google_ads_identity_completeness.sqlx"),
+  "utf8"
+);
 
 assert.strictEqual(parseGoogleAdsCustomerId("0"), 0);
 assert.strictEqual(parseGoogleAdsCustomerId("1703013237"), 1703013237);
@@ -210,6 +214,60 @@ assert.ok(
 assert.ok(
   clickMappingSql.includes("acc.account_name"),
   "Click mapping should continue reading the normalized Google Ads account_name column from the customer lookup."
+);
+
+assert.ok(
+  googleAdsIdentityAssertionSql.includes("platform = 'google_ads'") &&
+    googleAdsIdentityAssertionSql.includes("campaign_id IS NOT NULL") &&
+    googleAdsIdentityAssertionSql.includes("account_id IS NULL") &&
+    googleAdsIdentityAssertionSql.includes("account_name IS NULL") &&
+    googleAdsIdentityAssertionSql.includes("impressions") &&
+    googleAdsIdentityAssertionSql.includes("clicks") &&
+    googleAdsIdentityAssertionSql.includes("spend") &&
+    googleAdsIdentityAssertionSql.includes("platform_conversions_total"),
+  "Google Ads campaign mart assertion should fail orphaned campaign rows with missing account identity and expose Ads metrics in the failure sample."
+);
+
+assert.ok(
+  campaignPerformanceBaseSql.includes("NULLIF(CAST(s.paid_attribution.google_ads.ad_group_id AS STRING), '0')") &&
+    campaignPerformanceBaseSql.includes("NULLIF(CAST(m.paid_attribution.google_ads.ad_group_id AS STRING), '0')"),
+  "Campaign performance GA4 aggregates should normalize Google Ads ad_group_id 0 to NULL so PMax sessions join campaign-grain Ads rows."
+);
+
+const googleAdsPmaxSourceKey = {
+  date: "2026-04-27",
+  platform: "google_ads",
+  campaign_id: "18776968542",
+  ad_group_or_adset_id: null,
+  account_id: "1534842056",
+  spend: 10
+};
+
+const googleAdsPmaxGa4KeyBeforeFix = {
+  date: "2026-04-27",
+  platform: "google_ads",
+  campaign_id: "18776968542",
+  ad_group_or_adset_id: "0",
+  ga4_sessions: 11
+};
+
+assert.notStrictEqual(
+  googleAdsPmaxSourceKey.ad_group_or_adset_id,
+  googleAdsPmaxGa4KeyBeforeFix.ad_group_or_adset_id,
+  "The original PMax join shape reproduces the orphaned GA4 row: Ads uses NULL while GA4 attribution can use 0."
+);
+
+const googleAdsPmaxGa4KeyAfterFix = {
+  ...googleAdsPmaxGa4KeyBeforeFix,
+  ad_group_or_adset_id: googleAdsPmaxGa4KeyBeforeFix.ad_group_or_adset_id === "0"
+    ? null
+    : googleAdsPmaxGa4KeyBeforeFix.ad_group_or_adset_id
+};
+
+assert.strictEqual(
+  googleAdsPmaxSourceKey.ad_group_or_adset_id,
+  googleAdsPmaxGa4KeyAfterFix.ad_group_or_adset_id,
+  "Normalizing Google Ads ad_group_id 0 to NULL aligns PMax GA4 sessions with campaign-grain Ads rows."
 );
 
 const duplicatedGoogleAdsRows = [
