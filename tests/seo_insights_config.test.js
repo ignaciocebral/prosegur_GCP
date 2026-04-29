@@ -221,6 +221,8 @@ assert.ok(
 const ga4DailySql = seoInsights.buildGa4DailySql();
 const spainGa4DailySql = seoInsights.buildGa4DailySql({ outputDataset: "superform_outputs_286664974" });
 const spainCoverageSql = seoInsights.buildCoverageMatrixSql({ outputDataset: "superform_outputs_286664974" });
+const mexicoGa4DailySql = seoInsights.buildGa4DailySql({ outputDataset: "superform_outputs_297350911" });
+const mexicoMappingSql = seoInsights.buildSourceMappingDimSql({ outputDataset: "superform_outputs_297350911" });
 const cashEsGa4Scope = ga4DailySql.match(/WITH qualifying_sessions_Cash_ES AS \([\s\S]*?\n  \)\n  SELECT/)[0];
 const cashArGa4Scope = ga4DailySql.match(/WITH qualifying_sessions_Cash_AR AS \([\s\S]*?\n  \)\n  SELECT/)[0];
 const cashCoGa4Scope = ga4DailySql.match(/WITH qualifying_sessions_Cash_CO AS \([\s\S]*?\n  \)\n  SELECT/)[0];
@@ -293,6 +295,14 @@ assert.ok(
     !spainCoverageSql.includes("'CO' AS country_code") &&
     !spainCoverageSql.includes("'PT' AS country_code"),
   "SEO outputs scoped to superform_outputs_286664974 must not emit non-Spain country codes."
+);
+
+assert.ok(
+  mexicoGa4DailySql.includes("WHERE FALSE") &&
+    mexicoMappingSql.includes("WHERE FALSE") &&
+    !mexicoGa4DailySql.includes("'ES' AS country_code") &&
+    !mexicoGa4DailySql.includes("'AR' AS country_code"),
+  "Mapped output datasets without SEO market definitions should compile empty instead of leaking another country."
 );
 
 console.log("seo insights config regression tests passed");

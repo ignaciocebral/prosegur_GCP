@@ -960,6 +960,22 @@ function coverageSourceSystem(market, kpiKey) {
   return "not_available";
 }
 
+function emptyCoverageMatrixSql() {
+  return `
+SELECT
+  ${sqlString(FILTERS_VERSION)} AS filters_version,
+  CAST(NULL AS STRING) AS business_line,
+  CAST(NULL AS STRING) AS country_code,
+  CAST(NULL AS STRING) AS market,
+  CAST(NULL AS STRING) AS kpi,
+  CAST(NULL AS STRING) AS availability_status,
+  CAST(NULL AS STRING) AS source_system,
+  FALSE AS export_to_master,
+  CAST(NULL AS STRING) AS notes
+WHERE FALSE
+`;
+}
+
 function buildCoverageMatrixSql(options = {}) {
   const rows = [];
   for (const market of resolveMarkets(options)) {
@@ -979,7 +995,48 @@ function buildCoverageMatrixSql(options = {}) {
       );
     }
   }
+  if (rows.length === 0) {
+    return emptyCoverageMatrixSql();
+  }
   return rows.join("\nUNION ALL\n");
+}
+
+function emptyFilterSpecsSql() {
+  return `
+SELECT
+  ${sqlString(FILTERS_VERSION)} AS filters_version,
+  CAST(NULL AS STRING) AS market,
+  CAST(NULL AS STRING) AS business_line,
+  CAST(NULL AS STRING) AS country_code,
+  CAST(NULL AS STRING) AS dashboard_name,
+  CAST([] AS ARRAY<STRING>) AS included_countries,
+  CAST(NULL AS STRING) AS ga4_output_dataset,
+  CAST(NULL AS STRING) AS source_timezone,
+  CAST(NULL AS STRING) AS month_basis,
+  CAST(NULL AS STRING) AS allowed_channel_scope,
+  CAST(NULL AS STRING) AS primary_segmentation_field,
+  CAST(NULL AS STRING) AS business_type_include_regex,
+  CAST(NULL AS STRING) AS business_type_exclude_regex,
+  CAST([] AS ARRAY<STRING>) AS hostname_include,
+  CAST([] AS ARRAY<STRING>) AS hostname_exclude,
+  CAST(NULL AS STRING) AS page_include_regex,
+  CAST(NULL AS STRING) AS page_exclude_regex,
+  CAST(NULL AS STRING) AS lead_definition,
+  CAST(NULL AS STRING) AS qualified_lead_definition,
+  CAST(NULL AS STRING) AS sales_definition,
+  CAST(NULL AS STRING) AS revenue_definition,
+  CAST([] AS ARRAY<STRING>) AS source_systems,
+  CAST(NULL AS STRING) AS filter_validation_status,
+  CAST(NULL AS STRING) AS validation_notes,
+  CAST(NULL AS STRING) AS business_notes,
+  ${sqlString(DELIVERY_MEDIUM)} AS delivery_medium,
+  FALSE AS export_to_master,
+  CAST(NULL AS STRING) AS gsc_dataset,
+  CAST(NULL AS STRING) AS gsc_url_include_regex,
+  CAST(NULL AS STRING) AS gsc_url_exclude_regex,
+  CAST(NULL AS STRING) AS gsc_scope_status
+WHERE FALSE
+`;
 }
 
 function buildFilterSpecsSql(options = {}) {
@@ -1041,7 +1098,39 @@ function buildFilterSpecsSql(options = {}) {
     ].join(", ");
   });
 
+  if (rows.length === 0) {
+    return emptyFilterSpecsSql();
+  }
   return rows.join("\nUNION ALL\n");
+}
+
+function emptySourceMappingDimSql() {
+  return `
+SELECT
+  ${sqlString(FILTERS_VERSION)} AS filters_version,
+  CAST(NULL AS STRING) AS market,
+  CAST(NULL AS STRING) AS business_line,
+  CAST(NULL AS STRING) AS country_code,
+  CAST(NULL AS STRING) AS release_config_id,
+  ${sqlString(PROJECT_ID)} AS ga4_project,
+  CAST(NULL AS STRING) AS ga4_dataset,
+  CAST(NULL AS STRING) AS ga4_property_id,
+  CAST(NULL AS STRING) AS ga4_output_dataset,
+  CAST(NULL AS STRING) AS google_ads_customer_id,
+  CAST(NULL AS STRING) AS meta_ads_project,
+  CAST(NULL AS STRING) AS meta_ads_source,
+  CAST(NULL AS STRING) AS meta_ads_account_names,
+  ${sqlString(PROJECT_ID)} AS search_console_project,
+  CAST(NULL AS STRING) AS search_console_dataset,
+  CAST(NULL AS STRING) AS search_console_table,
+  CAST([] AS ARRAY<STRING>) AS gsc_site_url_include,
+  CAST(NULL AS STRING) AS gsc_url_include_regex,
+  CAST(NULL AS STRING) AS gsc_url_exclude_regex,
+  CAST(NULL AS STRING) AS gsc_scope_status,
+  CAST(NULL AS STRING) AS filter_validation_status,
+  FALSE AS export_to_master
+WHERE FALSE
+`;
 }
 
 function buildSourceMappingDimSql(options = {}) {
@@ -1077,6 +1166,9 @@ function buildSourceMappingDimSql(options = {}) {
     ].join(", ");
   });
 
+  if (rows.length === 0) {
+    return emptySourceMappingDimSql();
+  }
   return rows.join("\nUNION ALL\n");
 }
 
@@ -1203,7 +1295,28 @@ SELECT * FROM (
 `);
   }
 
+  if (parts.length === 0) {
+    return emptyDailySql(KPI_LABELS.sessions, "No GA4 SEO Insights markets configured for this output dataset.");
+  }
   return parts.join("\nUNION ALL\n");
+}
+
+function emptyDailySql(kpi, sourceDetail) {
+  return `
+SELECT
+  DATE('${SOURCE_START_DATE}') AS activity_date,
+  ${sqlString(FILTERS_VERSION)} AS filters_version,
+  CAST(NULL AS STRING) AS business_line,
+  CAST(NULL AS STRING) AS country_code,
+  CAST(NULL AS STRING) AS market,
+  CAST(NULL AS STRING) AS source_system,
+  CAST(NULL AS STRING) AS filter_validation_status,
+  CAST(NULL AS STRING) AS notes,
+  ${sqlString(kpi)} AS kpi,
+  0 AS metric_value,
+  ${sqlString(sourceDetail)} AS source_detail
+WHERE FALSE
+`;
 }
 
 function buildCcDailySql(options = {}) {
@@ -1248,21 +1361,7 @@ GROUP BY 1, 2, 3, 4, 5, 6, 7, 8
   }
 
   if (parts.length === 0) {
-    return `
-SELECT
-  DATE('${SOURCE_START_DATE}') AS activity_date,
-  ${sqlString(FILTERS_VERSION)} AS filters_version,
-  'none' AS business_line,
-  'XX' AS country_code,
-  'None' AS market,
-  'none' AS source_system,
-  'not_configured' AS filter_validation_status,
-  'No CC configuration available.' AS notes,
-  ${sqlString(KPI_LABELS.qualified_leads)} AS kpi,
-  0 AS metric_value,
-  'No source configured.' AS source_detail
-WHERE FALSE
-`;
+    return emptyDailySql(KPI_LABELS.qualified_leads, "No CC configuration available.");
   }
 
   return parts.join("\nUNION ALL\n");
@@ -1316,21 +1415,7 @@ GROUP BY 1, 2, 3, 4, 5, 6, 7, 8
   }
 
   if (parts.length === 0) {
-    return `
-SELECT
-  DATE('${SOURCE_START_DATE}') AS activity_date,
-  ${sqlString(FILTERS_VERSION)} AS filters_version,
-  'none' AS business_line,
-  'XX' AS country_code,
-  'None' AS market,
-  'none' AS source_system,
-  'not_configured' AS filter_validation_status,
-  'No sales source configured.' AS notes,
-  ${sqlString(KPI_LABELS.sales)} AS kpi,
-  0 AS metric_value,
-  'No source configured.' AS source_detail
-WHERE FALSE
-`;
+    return emptyDailySql(KPI_LABELS.sales, "No sales source configured.");
   }
 
   return parts.join("\nUNION ALL\n");
@@ -1422,6 +1507,9 @@ GROUP BY 1, 2, 3, 4, 5, 6, 7, 8
 `);
   }
 
+  if (parts.length === 0) {
+    return emptyDailySql(KPI_LABELS.gsc_impressions, "No Search Console SEO Insights markets configured for this output dataset.");
+  }
   return parts.join("\nUNION ALL\n");
 }
 
