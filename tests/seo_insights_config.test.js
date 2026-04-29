@@ -222,7 +222,8 @@ const ga4DailySql = seoInsights.buildGa4DailySql();
 const spainGa4DailySql = seoInsights.buildGa4DailySql({ outputDataset: "superform_outputs_286664974" });
 const spainCoverageSql = seoInsights.buildCoverageMatrixSql({ outputDataset: "superform_outputs_286664974" });
 const mexicoGa4DailySql = seoInsights.buildGa4DailySql({ outputDataset: "superform_outputs_297350911" });
-const mexicoMappingSql = seoInsights.buildSourceMappingDimSql({ outputDataset: "superform_outputs_297350911" });
+const mexicoGscDailySql = seoInsights.buildGscDailySql({ outputDataset: "superform_outputs_297350911" });
+const unknownMappingSql = seoInsights.buildSourceMappingDimSql({ outputDataset: "superform_outputs_999999999" });
 const cashEsGa4Scope = ga4DailySql.match(/WITH qualifying_sessions_Cash_ES AS \([\s\S]*?\n  \)\n  SELECT/)[0];
 const cashArGa4Scope = ga4DailySql.match(/WITH qualifying_sessions_Cash_AR AS \([\s\S]*?\n  \)\n  SELECT/)[0];
 const cashCoGa4Scope = ga4DailySql.match(/WITH qualifying_sessions_Cash_CO AS \([\s\S]*?\n  \)\n  SELECT/)[0];
@@ -298,11 +299,17 @@ assert.ok(
 );
 
 assert.ok(
-  mexicoGa4DailySql.includes("FROM UNNEST([]) AS _empty") &&
-    mexicoMappingSql.includes("FROM UNNEST([]) AS _empty") &&
+  mexicoGa4DailySql.includes("'MX' AS country_code") &&
+    mexicoGa4DailySql.includes("'Cash MX' AS market") &&
     !mexicoGa4DailySql.includes("'ES' AS country_code") &&
     !mexicoGa4DailySql.includes("'AR' AS country_code"),
-  "Mapped output datasets without SEO market definitions should compile empty instead of leaking another country."
+  "Cash MX should materialize as a Mexico-scoped SEO market without leaking another country."
+);
+
+assert.ok(
+  mexicoGscDailySql.includes("FROM UNNEST([]) AS _empty") &&
+    unknownMappingSql.includes("FROM UNNEST([]) AS _empty"),
+  "Markets without a Search Console export, and unknown output datasets, should compile empty instead of referencing missing tables."
 );
 
 console.log("seo insights config regression tests passed");

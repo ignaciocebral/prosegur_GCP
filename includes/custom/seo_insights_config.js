@@ -40,11 +40,14 @@ const GSC_KPI_KEYS = ["gsc_impressions", "gsc_clicks", "gsc_sum_position"];
 const GSC_DEFAULT_SEARCH_TYPE = "WEB";
 
 function gscDatasetForMarket(market) {
+  if (market.gscDatasetAvailable === false) {
+    return null;
+  }
   return `searchconsole_${market.countryCode.toLowerCase()}`;
 }
 
 function hasGscUrlScope(market) {
-  return Boolean(market.gscUrlIncludeRegex);
+  return market.gscDatasetAvailable !== false && Boolean(market.gscUrlIncludeRegex);
 }
 
 function propertyIdFromOutputDataset(outputDataset) {
@@ -271,6 +274,122 @@ const GA4_MARKETS = [
     validationNotes:
       "Cash PY uses business_type in GA4. Need Looker confirmation for exact filters.",
     businessNotes: "Cash PY is in the master export and supports the full KPI set."
+  },
+  {
+    businessLine: "cash",
+    countryCode: "DE",
+    market: "Cash DE",
+    includeInMasterExport: true,
+    outputDataset: "superform_outputs_297318261",
+    timezone: "Europe/Berlin",
+    dashboardName: "Organic SEO - EMEA - v.1",
+    trafficScope: "organic_search",
+    businessTypeIncludeRegex: "^cash$",
+    businessTypeExcludeRegex: "(combine|corporate|alarm|avos|rrhh|security|cipher)",
+    gscUrlIncludeRegex:
+      "^https?://(www\\.)?prosegur\\.de/(?:(?:produkte-und-services|b2b)/(?:cash|geld|wert|wechsel|kurier)|blog/cash|tankstellen|gastgewerbe|gesundheitsbereich)(?:/|$)",
+    hostnameInclude: [],
+    hostnameExclude: DEFAULT_HOSTNAME_EXCLUDE,
+    pageIncludeRegex: null,
+    pageExcludeRegex: null,
+    filterValidationStatus: "pending_looker_validation",
+    validationNotes:
+      "Cash DE uses BusinessType = Cash observed in the last 30 days. Search Console URL scope is derived from observed cash paths and needs Looker confirmation.",
+    businessNotes: "Cash DE is in the master export and supports the full KPI set."
+  },
+  {
+    businessLine: "cash",
+    countryCode: "MX",
+    market: "Cash MX",
+    includeInMasterExport: true,
+    outputDataset: "superform_outputs_297350911",
+    timezone: "America/Mexico_City",
+    dashboardName: "Organic SEO - LATAM Norte - v.1",
+    trafficScope: "organic_search",
+    businessTypeIncludeRegex: "^cash$",
+    businessTypeExcludeRegex: "(combine|corporate|alarm|avos|rrhh|security|cipher)",
+    gscDatasetAvailable: false,
+    gscUrlIncludeRegex:
+      "^https?://(www\\.)?grupoprosegur\\.com\\.mx/(?:(?:b2b|negocios-y-pymes|grandes-empresas)/(?:cash|transporte|estaciones|comercializadoras|farmacias|hoteles|banca|moda)|sobre-prosegur/prosegur-en-mexico)(?:/|$)",
+    hostnameInclude: [],
+    hostnameExclude: DEFAULT_HOSTNAME_EXCLUDE,
+    pageIncludeRegex: null,
+    pageExcludeRegex: null,
+    filterValidationStatus: "pending_looker_validation",
+    validationNotes:
+      "Cash MX uses BusinessType = Cash observed in the last 30 days. Search Console export dataset is not currently available in europe-west1.",
+    businessNotes: "Cash MX is in the master export and supports the full KPI set except Search Console until the export exists."
+  },
+  {
+    businessLine: "cash",
+    countryCode: "HN",
+    market: "Cash HN",
+    includeInMasterExport: true,
+    outputDataset: "superform_outputs_301773812",
+    timezone: "America/Tegucigalpa",
+    dashboardName: "Organic SEO - LATAM Norte - v.1",
+    trafficScope: "organic_search",
+    businessTypeIncludeRegex: null,
+    businessTypeExcludeRegex: "(combine|corporate|alarm|avos|rrhh|security|cipher)",
+    gscDatasetAvailable: false,
+    gscUrlIncludeRegex:
+      "^https?://(www\\.)?prosegur\\.hn/(?:(?:b2b|negocios|empresas)/(?:cash|transporte-valores-y-gestion-efectivo|administracion-tesoreria|supermercados|estaciones-servicio|distribuidoras|otros)|paginas-composiciones/modal-cash|gracias-cash)(?:/|$)",
+    hostnameInclude: [],
+    hostnameExclude: DEFAULT_HOSTNAME_EXCLUDE,
+    pageIncludeRegex:
+      "^/(?:b2b|negocios|empresas)/(?:cash|transporte-valores-y-gestion-efectivo|administracion-tesoreria|supermercados|estaciones-servicio|distribuidoras|otros)|^/paginas-composiciones/modal-cash|^/gracias-cash",
+    pageExcludeRegex: null,
+    filterValidationStatus: "pending_looker_validation",
+    validationNotes:
+      "Cash HN has blank BusinessType in the last 30 days, so GA4 is scoped by observed cash page paths. Search Console export dataset is not currently available in europe-west1.",
+    businessNotes: "Cash HN is in the master export and supports the full KPI set except Search Console until the export exists."
+  },
+  {
+    businessLine: "cash",
+    countryCode: "CR",
+    market: "Cash CR",
+    includeInMasterExport: true,
+    outputDataset: "superform_outputs_301780572",
+    timezone: "America/Costa_Rica",
+    dashboardName: "Organic SEO - LATAM Norte - v.1",
+    trafficScope: "organic_search",
+    businessTypeIncludeRegex: "^cash$",
+    businessTypeExcludeRegex: "(combine|corporate|alarm|avos|rrhh|security|cipher)",
+    gscDatasetAvailable: false,
+    gscUrlIncludeRegex:
+      "^https?://(www\\.)?prosegur\\.cr/(?:(?:b2b|negocios|empresas)/(?:cash|transporte-valores-y-gestion-efectivo|transporte-internacional|gestion-cajeros-automaticos|administracion-tesoreria|supermercados|estaciones-servicio|distribuidoras|corresponsal-bancario|institucion-bancaria|otros)|gracias-cash)(?:/|$)",
+    hostnameInclude: [],
+    hostnameExclude: DEFAULT_HOSTNAME_EXCLUDE,
+    pageIncludeRegex: null,
+    pageExcludeRegex: null,
+    filterValidationStatus: "pending_looker_validation",
+    validationNotes:
+      "Cash CR uses BusinessType = Cash observed in the last 30 days. Search Console export dataset is not currently available in europe-west1.",
+    businessNotes: "Cash CR is in the master export and supports the full KPI set except Search Console until the export exists."
+  },
+  {
+    businessLine: "cash",
+    countryCode: "GT",
+    market: "Cash GT",
+    includeInMasterExport: true,
+    outputDataset: "superform_outputs_301798001",
+    timezone: "America/Guatemala",
+    dashboardName: "Organic SEO - LATAM Norte - v.1",
+    trafficScope: "organic_search",
+    businessTypeIncludeRegex: null,
+    businessTypeExcludeRegex: "(combine|corporate|alarm|avos|rrhh|security|cipher)",
+    gscDatasetAvailable: false,
+    gscUrlIncludeRegex:
+      "^https?://(www\\.)?prosegur\\.gt/(?:(?:b2b|negocios|empresas)/(?:cash|transporte-valores-y-gestion-efectivo|gestion-cajeros-automaticos|administracion-tesoreria|supermercados|estaciones-servicio|institucion-bancaria)|paginas-composiciones/modal-cash|gracias-cash|articulo/sala-de-prensa/(?:seguridad-manejo-efectivo|riesgos-recomendaciones-manejo-resguardo-dinero-efectivo))(?:/|$)",
+    hostnameInclude: [],
+    hostnameExclude: DEFAULT_HOSTNAME_EXCLUDE,
+    pageIncludeRegex:
+      "^/(?:b2b|negocios|empresas)/(?:cash|transporte-valores-y-gestion-efectivo|gestion-cajeros-automaticos|administracion-tesoreria|supermercados|estaciones-servicio|institucion-bancaria)|^/paginas-composiciones/modal-cash|^/gracias-cash|^/articulo/sala-de-prensa/(?:seguridad-manejo-efectivo|riesgos-recomendaciones-manejo-resguardo-dinero-efectivo)",
+    pageExcludeRegex: null,
+    filterValidationStatus: "pending_looker_validation",
+    validationNotes:
+      "Cash GT has blank BusinessType in the last 30 days, so GA4 is scoped by observed cash page paths. Search Console export dataset is not currently available in europe-west1.",
+    businessNotes: "Cash GT is in the master export and supports the full KPI set except Search Console until the export exists."
   },
   {
     businessLine: "security",
@@ -545,6 +664,11 @@ const CC_QUALIFIED_MARKETS = [
   "Cash EC",
   "Cash UY",
   "Cash PY",
+  "Cash DE",
+  "Cash MX",
+  "Cash HN",
+  "Cash CR",
+  "Cash GT",
   "Seg ES"
 ];
 
@@ -688,6 +812,76 @@ const SALES_SOURCE_CONFIGS = [
       "country_id = 'UY' AND LOWER(COALESCE(attribution_channel, '')) = 'organic' AND LOWER(COALESCE(stage, '')) = 'ganada'",
     validationNotes:
       "Uses the gold sales_leads_cash fact filtered to UY, attribution_channel = Organic and stage = Ganada."
+  },
+  {
+    market: "Cash DE",
+    businessLine: "cash",
+    countryCode: "DE",
+    sourceSystem: "sales_gold.sales_leads_cash",
+    sourceTable: "`pga-data-b2b-marketing-dev.sales_gold.sales_leads_cash`",
+    dateExpression: "sale_date",
+    salesExpression: "COUNT(DISTINCT offer_id)",
+    revenueExpression: "SUM(COALESCE(net_amount_eur, 0))",
+    extraWhere:
+      "country_id = 'DE' AND LOWER(COALESCE(attribution_channel, '')) = 'organic' AND LOWER(COALESCE(stage, '')) = 'ganada'",
+    validationNotes:
+      "Uses the gold sales_leads_cash fact filtered to DE, attribution_channel = Organic and stage = Ganada."
+  },
+  {
+    market: "Cash MX",
+    businessLine: "cash",
+    countryCode: "MX",
+    sourceSystem: "sales_gold.sales_leads_cash",
+    sourceTable: "`pga-data-b2b-marketing-dev.sales_gold.sales_leads_cash`",
+    dateExpression: "sale_date",
+    salesExpression: "COUNT(DISTINCT offer_id)",
+    revenueExpression: "SUM(COALESCE(net_amount_eur, 0))",
+    extraWhere:
+      "country_id = 'MX' AND LOWER(COALESCE(attribution_channel, '')) = 'organic' AND LOWER(COALESCE(stage, '')) = 'ganada'",
+    validationNotes:
+      "Uses the gold sales_leads_cash fact filtered to MX, attribution_channel = Organic and stage = Ganada."
+  },
+  {
+    market: "Cash HN",
+    businessLine: "cash",
+    countryCode: "HN",
+    sourceSystem: "sales_gold.sales_leads_cash",
+    sourceTable: "`pga-data-b2b-marketing-dev.sales_gold.sales_leads_cash`",
+    dateExpression: "sale_date",
+    salesExpression: "COUNT(DISTINCT offer_id)",
+    revenueExpression: "SUM(COALESCE(net_amount_eur, 0))",
+    extraWhere:
+      "country_id = 'HN' AND LOWER(COALESCE(attribution_channel, '')) = 'organic' AND LOWER(COALESCE(stage, '')) = 'ganada'",
+    validationNotes:
+      "Uses the gold sales_leads_cash fact filtered to HN, attribution_channel = Organic and stage = Ganada."
+  },
+  {
+    market: "Cash CR",
+    businessLine: "cash",
+    countryCode: "CR",
+    sourceSystem: "sales_gold.sales_leads_cash",
+    sourceTable: "`pga-data-b2b-marketing-dev.sales_gold.sales_leads_cash`",
+    dateExpression: "sale_date",
+    salesExpression: "COUNT(DISTINCT offer_id)",
+    revenueExpression: "SUM(COALESCE(net_amount_eur, 0))",
+    extraWhere:
+      "country_id = 'CR' AND LOWER(COALESCE(attribution_channel, '')) = 'organic' AND LOWER(COALESCE(stage, '')) = 'ganada'",
+    validationNotes:
+      "Uses the gold sales_leads_cash fact filtered to CR, attribution_channel = Organic and stage = Ganada."
+  },
+  {
+    market: "Cash GT",
+    businessLine: "cash",
+    countryCode: "GT",
+    sourceSystem: "sales_gold.sales_leads_cash",
+    sourceTable: "`pga-data-b2b-marketing-dev.sales_gold.sales_leads_cash`",
+    dateExpression: "sale_date",
+    salesExpression: "COUNT(DISTINCT offer_id)",
+    revenueExpression: "SUM(COALESCE(net_amount_eur, 0))",
+    extraWhere:
+      "country_id = 'GT' AND LOWER(COALESCE(attribution_channel, '')) = 'organic' AND LOWER(COALESCE(stage, '')) = 'ganada'",
+    validationNotes:
+      "Uses the gold sales_leads_cash fact filtered to GT, attribution_channel = Organic and stage = Ganada."
   },
   {
     market: "Seg ES",
@@ -902,6 +1096,9 @@ function kpiAvailability(market, kpiKey) {
   }
 
   if (GSC_KPI_KEYS.includes(kpiKey)) {
+    if (market.gscDatasetAvailable === false) {
+      return "not_available";
+    }
     return hasGscUrlScope(market) ? "available" : "partial";
   }
 
@@ -910,6 +1107,9 @@ function kpiAvailability(market, kpiKey) {
 
 function coverageNotes(market, kpiKey) {
   if (GSC_KPI_KEYS.includes(kpiKey)) {
+    if (market.gscDatasetAvailable === false) {
+      return "Search Console export dataset is not available for this market.";
+    }
     if (hasGscUrlScope(market)) {
       return `Search Console scoped via gscUrlIncludeRegex on ${gscDatasetForMarket(market)}.`;
     }
@@ -951,6 +1151,9 @@ function coverageSourceSystem(market, kpiKey) {
     return market.businessLine === "security" ? "cc_gold.cc_leads_security" : "cc_gold.cc_leads_master";
   }
   if (GSC_KPI_KEYS.includes(kpiKey)) {
+    if (market.gscDatasetAvailable === false) {
+      return "not_available";
+    }
     return `${gscDatasetForMarket(market)}.searchdata_url_impression`;
   }
   const salesSource = findSalesSource(market.market);
@@ -1083,7 +1286,7 @@ function buildFilterSpecsSql(options = {}) {
             ? (market.businessLine === "security" ? "cc_gold.cc_leads_security" : "cc_gold.cc_leads_master")
             : null,
           salesSource ? salesSource.sourceSystem : null,
-          `${gscDatasetForMarket(market)}.searchdata_url_impression`
+          market.gscDatasetAvailable === false ? null : `${gscDatasetForMarket(market)}.searchdata_url_impression`
         ].filter(Boolean)
       )} AS source_systems`,
       `${sqlString(market.filterValidationStatus)} AS filter_validation_status`,
@@ -1426,6 +1629,9 @@ function buildGscDailySql(options = {}) {
   const parts = [];
 
   for (const market of resolveMarkets(options)) {
+    if (market.gscDatasetAvailable === false) {
+      continue;
+    }
     const dataset = gscDatasetForMarket(market);
     const sourceSystem = `${dataset}.searchdata_url_impression`;
     const hasUrlScope = hasGscUrlScope(market);
