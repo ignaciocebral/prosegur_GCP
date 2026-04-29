@@ -12,19 +12,15 @@ config {
 
 js {
   const { helpers } = require("includes/core/helpers");
+  const {
+    buildCrmLeadEventPredicateSql,
+    buildNormalizedLeadUrlSql,
+    buildCcLeadUrlScopeSql
+  } = require("includes/custom/lead_matching_helpers.js");
   const config = helpers.getConfig();
-  const leadEventPredicate = `
-    (
-      REGEXP_CONTAINS(LOWER(e.event_name), r'cmb')
-      OR (
-        REGEXP_CONTAINS(LOWER(e.event_name), r'form')
-        AND NOT REGEXP_CONTAINS(LOWER(e.event_name), r'formulario')
-      )
-      OR REGEXP_CONTAINS(LOWER(e.event_name), r'c2c')
-      OR e.event_name = 'generate_lead'
-      OR LOWER(e.event_name) = 'generate_lead_crm'
-    )
-  `;
+  const leadEventPredicate = buildCrmLeadEventPredicateSql("e");
+  const normalizeUrlSql = buildNormalizedLeadUrlSql;
+  const ccLeadUrlScopeSql = buildCcLeadUrlScopeSql(dataform.projectConfig.vars.GA4_PROJECT);
 }
 
 pre_operations {
@@ -60,6 +56,10 @@ WITH touched_idleads AS (
     AND ${leadEventPredicate}
 ),
 
+cc_lead_url_scope AS (
+  ${ccLeadUrlScopeSql}
+),
+
 lead_events AS (
   SELECT
     e.event_date,
@@ -69,7 +69,9 @@ lead_events AS (
     e.event_params_custom.IdLead AS IdLead,
     e.event_name,
     e.geo.country AS country,
+    e.page.location AS page_location,
     e.page.path AS page_path,
+    ${normalizeUrlSql("e.page.location")} AS normalized_page_url,
     e.device.category AS device_category,
     -- Keep source/medium aligned with the bridge contract: use session last-non-direct
     -- attribution when it exists, otherwise fall back to the event-level fixed source.
@@ -93,10 +95,17 @@ lead_events AS (
       AND NOT REGEXP_CONTAINS(LOWER(e.event_name), r"formulario") AS is_form,
     REGEXP_CONTAINS(LOWER(e.event_name), r"c2c") AS is_c2c,
     e.event_name = "generate_lead"
-      OR LOWER(e.event_name) = "generate_lead_crm" AS is_generate_lead
+      OR LOWER(e.event_name) = "generate_lead_crm" AS is_generate_lead,
+    cc.normalized_url IS NULL AS is_matching_excluded_url,
+    CASE
+      WHEN cc.normalized_url IS NULL THEN "url_not_in_recent_cc_leads_master"
+      ELSE NULL
+    END AS matching_exclusion_reason
   FROM ${ref("ga4_events")} e
   LEFT JOIN ${ref("ga4_sessions")} s
     ON e.session_id = s.session_id
+  LEFT JOIN cc_lead_url_scope cc
+    ON ${normalizeUrlSql("e.page.location")} = cc.normalized_url
   WHERE e.event_params_custom.IdLead IS NOT NULL
     AND e.event_params_custom.IdLead != ""
     AND (
@@ -115,7 +124,9 @@ ranked_events AS (
     IdLead,
     event_name,
     country,
+    page_location,
     page_path,
+    normalized_page_url,
     device_category,
     source,
     medium,
@@ -127,7 +138,9 @@ ranked_events AS (
     is_cmb,
     is_form,
     is_c2c,
-    is_generate_lead
+    is_generate_lead,
+    is_matching_excluded_url,
+    matching_exclusion_reason
   FROM lead_events
 )
 
@@ -139,7 +152,9 @@ SELECT
   IdLead,
   event_name,
   country,
+  page_location,
   page_path,
+  normalized_page_url,
   device_category,
   source,
   medium,
@@ -149,5 +164,7 @@ SELECT
   is_cmb,
   is_form,
   is_c2c,
-  is_generate_lead
+  is_generate_lead,
+  is_matching_excluded_url,
+  matching_exclusion_reason
 FROM ranked_events

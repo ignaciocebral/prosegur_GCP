@@ -227,7 +227,7 @@ ga4_conversions_by_campaign AS (
       AND NOT REGEXP_CONTAINS(LOWER(e.event_name), r'formulario')
     ) AS ga4_conversions_form,
     COUNTIF(REGEXP_CONTAINS(LOWER(e.event_name), r'c2c')) AS ga4_conversions_c2c,
-    COUNTIF(e.event_name = 'generate_lead') AS ga4_conversions_generate_lead,
+    COUNTIF(e.event_name = 'generate_lead' OR LOWER(e.event_name) = 'generate_lead_crm') AS ga4_conversions_generate_lead,
     COUNTIF(e.event_name = 'page_view') AS ga4_page_views
   FROM ${ref("int_session_paid_attribution")} m
   INNER JOIN ${ref("ga4_events")} e
@@ -240,6 +240,7 @@ ga4_conversions_by_campaign AS (
         AND NOT REGEXP_CONTAINS(LOWER(e.event_name), r'formulario')
       )
       OR e.event_name = 'generate_lead'
+      OR LOWER(e.event_name) = 'generate_lead_crm'
     )
   GROUP BY 1, 2, 3, 4
 ),

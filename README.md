@@ -128,6 +128,23 @@ Derived:
 
 If an account mapping changes, update `PROPERTY_SOURCE_MAPPINGS` and validate the generated dimension. Do not update this mapping casually as part of URL-filter work.
 
+## GA4 Visitor Geo vs CRM Country
+
+Do not use GA4 `geo.country` as proof that a lead belongs to a different business country.
+
+For country performance, the business country is the Dataform release/output dataset country and, for call-center analysis, the CRM country in `cc_gold.cc_leads_master.country_id`. A user can browse a local domain from another geolocation, so `ga4_lead_event_bridge.country` may show a visitor country such as Colombia, Brazil, Spain, `(not set)`, or blank while the joined `IdLead = lead_id` row in `cc_leads_master` is still a valid lead for the local market.
+
+Example pattern observed during the 2026-04 country-isolation review:
+
+```text
+OUTPUTS_DATASET = superform_outputs_297349390  # Chile
+ga4_lead_event_bridge.country = Colombia       # visitor geo
+cc_leads_master.country_id = CL                # CRM/business country
+cc_leads_master.url contains prosegur.cl       # local domain journey
+```
+
+This is expected and useful for user-journey analysis. Assertions or filters that validate release-country isolation for lead joins should use the CRM/business country when the `IdLead` join exists. GA4 visitor geo can be reported as an explanatory dimension, but it should not be treated as the release-country contract by itself.
+
 ## Alberto's URL Filter Workflow
 
 Alberto's normal task is to refine the organic URL scope for a market so Search Console and organic page-based signals align with the business line being analyzed.
