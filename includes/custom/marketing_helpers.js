@@ -11,7 +11,7 @@ function buildCountryCodeFromNameSql(columnName) {
       WHEN REGEXP_CONTAINS(LOWER(COALESCE(${columnName}, '')), r'espana|espa|spain|corporativ') THEN 'ES'
       WHEN REGEXP_CONTAINS(LOWER(COALESCE(${columnName}, '')), r'guatemala') THEN 'GT'
       WHEN REGEXP_CONTAINS(LOWER(COALESCE(${columnName}, '')), r'honduras') THEN 'HN'
-      WHEN REGEXP_CONTAINS(LOWER(COALESCE(${columnName}, '')), r'mexico|mex') THEN 'MX'
+      WHEN REGEXP_CONTAINS(LOWER(COALESCE(${columnName}, '')), r'mexico|m[eé]x|méxico') THEN 'MX'
       WHEN REGEXP_CONTAINS(LOWER(COALESCE(${columnName}, '')), r'paraguay|paragua') THEN 'PY'
       WHEN REGEXP_CONTAINS(LOWER(COALESCE(${columnName}, '')), r'peru|per') THEN 'PE'
       WHEN REGEXP_CONTAINS(LOWER(COALESCE(${columnName}, '')), r'portug') THEN 'PT'
