@@ -978,7 +978,7 @@ const PROPERTY_SOURCE_MAPPINGS = {
     releaseConfigId: "mexico",
     ga4Dataset: "analytics_297350911",
     googleAdsCustomerId: "4257302672",
-    metaAdsAccountNames: null,
+    metaAdsAccountNames: "Prosegur Cash México",
     metaAdsProject: "spring-line-421422",
     metaAdsSource: "meta_api_insights"
   },
@@ -1018,7 +1018,7 @@ const PROPERTY_SOURCE_MAPPINGS = {
     releaseConfigId: "costa_rica",
     ga4Dataset: "analytics_301780572",
     googleAdsCustomerId: "2868362260",
-    metaAdsAccountNames: null,
+    metaAdsAccountNames: "Prosegur Cash Costa Rica_dolar",
     metaAdsProject: "spring-line-421422",
     metaAdsSource: "meta_api_insights"
   },

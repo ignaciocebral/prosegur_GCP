@@ -4,7 +4,8 @@ const {
   parseMetaAccountNames,
   buildMetaAccountFilterSql,
   buildMetaDisallowedAccountsSql,
-  buildMetaIncrementalDateCheckpointSql
+  buildMetaIncrementalDateCheckpointSql,
+  buildCountryCodeFromNameSql
 } = require("../includes/custom/marketing_helpers.js");
 const {
   buildMetaAdsConversionBucketSql,
@@ -14,6 +15,23 @@ const {
 assert.deepStrictEqual(
   parseMetaAccountNames(" Prosegur Cash Guatemala | Prosegur Cash Paraguay_refresh "),
   ["Prosegur Cash Guatemala", "Prosegur Cash Paraguay_refresh"]
+);
+
+// UTF-8 account names with diacritics must round-trip into SQL filters.
+assert.strictEqual(
+  buildMetaAccountFilterSql("Prosegur España", "account"),
+  "AND account IN ('Prosegur España')"
+);
+assert.strictEqual(
+  buildMetaAccountFilterSql("Prosegur Cash México", "account"),
+  "AND account IN ('Prosegur Cash México')"
+);
+
+// Country regex must match accented variants used by Meta account names.
+const countrySql = buildCountryCodeFromNameSql("account");
+assert.ok(
+  countrySql.includes("m[eé]x") || countrySql.includes("méx"),
+  "Country regex must accept accented Mexico (México) so MX rows are not bucketed as Other."
 );
 
 assert.strictEqual(
