@@ -82,6 +82,38 @@ Consumer-facing tables:
 
 The intermediate `seo_insights_*_daily` tables are implementation tables, not the main consumer contract.
 
+### Search Console API Gap-Fill
+
+Mexico, Honduras, Costa Rica, and Guatemala use a temporary Search Console API gap-fill until their native Search Console BigQuery bulk export is available. The Dataform SQL still reads the normal country datasets:
+
+| Country | Dataset | Search Console property | Source mode |
+| --- | --- | --- | --- |
+| MX | `searchconsole_mx` | `sc-domain:grupoprosegur.com.mx` | API gap-fill |
+| HN | `searchconsole_hn` | `sc-domain:prosegur.hn` | API gap-fill |
+| CR | `searchconsole_cr` | `sc-domain:prosegur.cr` | API gap-fill |
+| GT | `searchconsole_gt` | `sc-domain:prosegur.gt` | API gap-fill |
+
+Run this before the SEO Insights Dataform workflow while those native exports are missing:
+
+```powershell
+python tools/search_console_api_gapfill.py --countries mx,hn,cr,gt
+```
+
+The default refresh window is rolling and idempotent: it replaces the last 10 Search Console-safe days, ending at today minus 3 days. For a first bootstrap or a historical repair, pass the explicit window:
+
+```powershell
+python tools/search_console_api_gapfill.py --countries mx,hn,cr,gt --start-date 2025-01-01 --end-date 2026-04-26
+```
+
+After introducing a new API-backed country into `GA4_MARKETS`, run the SEO Insights Dataform tables with a full refresh once so historical rows are generated for the new market. Normal scheduled runs can return to the rolling API refresh plus incremental Dataform execution after that.
+
+The loader writes:
+
+- `searchdata_url_impression` with `data_date`, `site_url`, `url`, `query`, `country`, `search_type`, `device`, `impressions`, `clicks`, and API-derived `sum_position`.
+- `searchdata_site_impression` with `data_date`, `site_url`, `query`, `country`, `search_type`, `device`, `impressions`, `clicks`, and API-derived `sum_top_position`.
+
+When native Search Console BigQuery export is confirmed for one of these countries, remove that country from the API gap-fill command and change its `gscSourceMode` in `includes/custom/seo_insights_config.js` back to the default bulk-export mode.
+
 ## Source Mapping Dimension
 
 `dim_seo_insights_source_mapping` is generated from repo configuration, not dynamically discovered from GA4 Admin, Google Ads, Meta Ads, or Search Console APIs.
@@ -104,7 +136,8 @@ For every market in `GA4_MARKETS`, the helper:
    - `ES` -> `searchconsole_es.searchdata_url_impression`
    - `BR` -> `searchconsole_br.searchdata_url_impression`
    - same pattern for the other country codes.
-6. Emits one SQL row per market using `UNION ALL`.
+6. Exposes `search_console_source_mode`, which is normally `bigquery_export` and temporarily `search_console_api_gapfill` for MX/HN/CR/GT.
+7. Emits one SQL row per market using `UNION ALL`.
 
 Example:
 
@@ -263,7 +296,7 @@ Remote validation completed in `spring-line-421422/europe-west1/repositories/ga4
   - `seo_insights_semantic_daily`
   - `seo_insights_monthly_raw_export`
 
-The source mapping dimension has 23 market rows. GA4, Google Ads, and Search Console are populated for all 23. Meta Ads is populated where the current release-config/account mapping exists.
+The source mapping dimension has 27 market rows. GA4 and Search Console are populated for all 27, including MX/HN/CR/GT through the temporary API gap-fill tables. Google Ads and Meta Ads are populated where the current release-config/account mapping exists.
 
 ## Access Model for Alberto
 

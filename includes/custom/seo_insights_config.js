@@ -1,5 +1,5 @@
 const PROJECT_ID = "pga-data-b2b-marketing-dev";
-const FILTERS_VERSION = "seo_insights_filters_2026_04_23_daily_gsc";
+const FILTERS_VERSION = "seo_insights_filters_2026_04_29_gsc_api_gapfill";
 const TEMPLATE_YEAR = 2026;
 const COMPARISON_YEAR = 2025;
 const SOURCE_START_DATE = "2025-01-01";
@@ -38,12 +38,18 @@ const KPI_KEYS = [
 const GSC_KPI_KEYS = ["gsc_impressions", "gsc_clicks", "gsc_sum_position"];
 
 const GSC_DEFAULT_SEARCH_TYPE = "WEB";
+const GSC_SOURCE_BIGQUERY_EXPORT = "bigquery_export";
+const GSC_SOURCE_API_GAPFILL = "search_console_api_gapfill";
 
 function gscDatasetForMarket(market) {
   if (market.gscDatasetAvailable === false) {
     return null;
   }
   return `searchconsole_${market.countryCode.toLowerCase()}`;
+}
+
+function gscSourceMode(market) {
+  return market.gscSourceMode || GSC_SOURCE_BIGQUERY_EXPORT;
 }
 
 function hasGscUrlScope(market) {
@@ -308,17 +314,18 @@ const GA4_MARKETS = [
     trafficScope: "organic_search",
     businessTypeIncludeRegex: "^cash$",
     businessTypeExcludeRegex: "(combine|corporate|alarm|avos|rrhh|security|cipher)",
-    gscDatasetAvailable: false,
+    gscSourceMode: GSC_SOURCE_API_GAPFILL,
+    gscApiSiteUrl: "sc-domain:grupoprosegur.com.mx",
     gscUrlIncludeRegex:
       "^https?://(www\\.)?grupoprosegur\\.com\\.mx/(?:(?:b2b|negocios-y-pymes|grandes-empresas)/(?:cash|transporte|estaciones|comercializadoras|farmacias|hoteles|banca|moda)|sobre-prosegur/prosegur-en-mexico)(?:/|$)",
     hostnameInclude: [],
     hostnameExclude: DEFAULT_HOSTNAME_EXCLUDE,
     pageIncludeRegex: null,
     pageExcludeRegex: null,
-    filterValidationStatus: "pending_looker_validation",
+    filterValidationStatus: "api_gapfill_pending_looker_validation",
     validationNotes:
-      "Cash MX uses BusinessType = Cash observed in the last 30 days. Search Console export dataset is not currently available in europe-west1.",
-    businessNotes: "Cash MX is in the master export and supports the full KPI set except Search Console until the export exists."
+      "Cash MX uses BusinessType = Cash observed in the last 30 days. Search Console is temporarily loaded from the API into searchconsole_mx until the native BigQuery export is provisioned in europe-west1; URL scope still needs Looker confirmation.",
+    businessNotes: "Cash MX is in the master export and supports the full KPI set; Search Console comes from the API gap-fill until the native export lands."
   },
   {
     businessLine: "cash",
@@ -331,7 +338,8 @@ const GA4_MARKETS = [
     trafficScope: "organic_search",
     businessTypeIncludeRegex: null,
     businessTypeExcludeRegex: "(combine|corporate|alarm|avos|rrhh|security|cipher)",
-    gscDatasetAvailable: false,
+    gscSourceMode: GSC_SOURCE_API_GAPFILL,
+    gscApiSiteUrl: "sc-domain:prosegur.hn",
     gscUrlIncludeRegex:
       "^https?://(www\\.)?prosegur\\.hn/(?:(?:b2b|negocios|empresas)/(?:cash|transporte-valores-y-gestion-efectivo|administracion-tesoreria|supermercados|estaciones-servicio|distribuidoras|otros)|paginas-composiciones/modal-cash|gracias-cash)(?:/|$)",
     hostnameInclude: [],
@@ -339,10 +347,10 @@ const GA4_MARKETS = [
     pageIncludeRegex:
       "^/(?:b2b|negocios|empresas)/(?:cash|transporte-valores-y-gestion-efectivo|administracion-tesoreria|supermercados|estaciones-servicio|distribuidoras|otros)|^/paginas-composiciones/modal-cash|^/gracias-cash",
     pageExcludeRegex: null,
-    filterValidationStatus: "pending_looker_validation",
+    filterValidationStatus: "api_gapfill_pending_looker_validation",
     validationNotes:
-      "Cash HN has blank BusinessType in the last 30 days, so GA4 is scoped by observed cash page paths. Search Console export dataset is not currently available in europe-west1.",
-    businessNotes: "Cash HN is in the master export and supports the full KPI set except Search Console until the export exists."
+      "Cash HN has blank BusinessType in the last 30 days, so GA4 is scoped by observed cash page paths. Search Console is temporarily loaded from the API into searchconsole_hn until the native BigQuery export is provisioned in europe-west1; URL scope still needs Looker confirmation.",
+    businessNotes: "Cash HN is in the master export and supports the full KPI set; Search Console comes from the API gap-fill until the native export lands."
   },
   {
     businessLine: "cash",
@@ -355,17 +363,18 @@ const GA4_MARKETS = [
     trafficScope: "organic_search",
     businessTypeIncludeRegex: "^cash$",
     businessTypeExcludeRegex: "(combine|corporate|alarm|avos|rrhh|security|cipher)",
-    gscDatasetAvailable: false,
+    gscSourceMode: GSC_SOURCE_API_GAPFILL,
+    gscApiSiteUrl: "sc-domain:prosegur.cr",
     gscUrlIncludeRegex:
       "^https?://(www\\.)?prosegur\\.cr/(?:(?:b2b|negocios|empresas)/(?:cash|transporte-valores-y-gestion-efectivo|transporte-internacional|gestion-cajeros-automaticos|administracion-tesoreria|supermercados|estaciones-servicio|distribuidoras|corresponsal-bancario|institucion-bancaria|otros)|gracias-cash)(?:/|$)",
     hostnameInclude: [],
     hostnameExclude: DEFAULT_HOSTNAME_EXCLUDE,
     pageIncludeRegex: null,
     pageExcludeRegex: null,
-    filterValidationStatus: "pending_looker_validation",
+    filterValidationStatus: "api_gapfill_pending_looker_validation",
     validationNotes:
-      "Cash CR uses BusinessType = Cash observed in the last 30 days. Search Console export dataset is not currently available in europe-west1.",
-    businessNotes: "Cash CR is in the master export and supports the full KPI set except Search Console until the export exists."
+      "Cash CR uses BusinessType = Cash observed in the last 30 days. Search Console is temporarily loaded from the API into searchconsole_cr until the native BigQuery export is provisioned in europe-west1; URL scope still needs Looker confirmation.",
+    businessNotes: "Cash CR is in the master export and supports the full KPI set; Search Console comes from the API gap-fill until the native export lands."
   },
   {
     businessLine: "cash",
@@ -378,7 +387,8 @@ const GA4_MARKETS = [
     trafficScope: "organic_search",
     businessTypeIncludeRegex: null,
     businessTypeExcludeRegex: "(combine|corporate|alarm|avos|rrhh|security|cipher)",
-    gscDatasetAvailable: false,
+    gscSourceMode: GSC_SOURCE_API_GAPFILL,
+    gscApiSiteUrl: "sc-domain:prosegur.gt",
     gscUrlIncludeRegex:
       "^https?://(www\\.)?prosegur\\.gt/(?:(?:b2b|negocios|empresas)/(?:cash|transporte-valores-y-gestion-efectivo|gestion-cajeros-automaticos|administracion-tesoreria|supermercados|estaciones-servicio|institucion-bancaria)|paginas-composiciones/modal-cash|gracias-cash|articulo/sala-de-prensa/(?:seguridad-manejo-efectivo|riesgos-recomendaciones-manejo-resguardo-dinero-efectivo))(?:/|$)",
     hostnameInclude: [],
@@ -386,10 +396,10 @@ const GA4_MARKETS = [
     pageIncludeRegex:
       "^/(?:b2b|negocios|empresas)/(?:cash|transporte-valores-y-gestion-efectivo|gestion-cajeros-automaticos|administracion-tesoreria|supermercados|estaciones-servicio|institucion-bancaria)|^/paginas-composiciones/modal-cash|^/gracias-cash|^/articulo/sala-de-prensa/(?:seguridad-manejo-efectivo|riesgos-recomendaciones-manejo-resguardo-dinero-efectivo)",
     pageExcludeRegex: null,
-    filterValidationStatus: "pending_looker_validation",
+    filterValidationStatus: "api_gapfill_pending_looker_validation",
     validationNotes:
-      "Cash GT has blank BusinessType in the last 30 days, so GA4 is scoped by observed cash page paths. Search Console export dataset is not currently available in europe-west1.",
-    businessNotes: "Cash GT is in the master export and supports the full KPI set except Search Console until the export exists."
+      "Cash GT has blank BusinessType in the last 30 days, so GA4 is scoped by observed cash page paths. Search Console is temporarily loaded from the API into searchconsole_gt until the native BigQuery export is provisioned in europe-west1; URL scope still needs Looker confirmation.",
+    businessNotes: "Cash GT is in the master export and supports the full KPI set; Search Console comes from the API gap-fill until the native export lands."
   },
   {
     businessLine: "security",
@@ -1110,10 +1120,21 @@ function coverageNotes(market, kpiKey) {
     if (market.gscDatasetAvailable === false) {
       return "Search Console export dataset is not available for this market.";
     }
+    const sourcePrefix =
+      gscSourceMode(market) === GSC_SOURCE_API_GAPFILL
+        ? `Search Console API gap-fill loaded into ${gscDatasetForMarket(market)}.`
+        : null;
     if (hasGscUrlScope(market)) {
-      return `Search Console scoped via gscUrlIncludeRegex on ${gscDatasetForMarket(market)}.`;
+      return [sourcePrefix, `Search Console scoped via gscUrlIncludeRegex on ${gscDatasetForMarket(market)}.`]
+        .filter(Boolean)
+        .join(" ");
     }
-    return `Search Console rolled up at country level (${gscDatasetForMarket(market)}). Same value across markets sharing this country until gscUrlIncludeRegex is provided.`;
+    return [
+      sourcePrefix,
+      `Search Console rolled up at country level (${gscDatasetForMarket(market)}). Same value across markets sharing this country until gscUrlIncludeRegex is provided.`
+    ]
+      .filter(Boolean)
+      .join(" ");
   }
 
   if (["talent", "avos"].includes(market.businessLine) && !market.includeInMasterExport) {
@@ -1295,6 +1316,8 @@ function buildFilterSpecsSql(options = {}) {
       `${sqlString(DELIVERY_MEDIUM)} AS delivery_medium`,
       `${sqlBool(market.includeInMasterExport)} AS export_to_master`,
       `${sqlString(gscDatasetForMarket(market))} AS gsc_dataset`,
+      `${sqlString(gscSourceMode(market))} AS gsc_source_mode`,
+      `${sqlString(market.gscApiSiteUrl || null)} AS gsc_api_site_url`,
       `${sqlString(market.gscUrlIncludeRegex || null)} AS gsc_url_include_regex`,
       `${sqlString(market.gscUrlExcludeRegex || null)} AS gsc_url_exclude_regex`,
       `${sqlString(hasGscUrlScope(market) ? "market_scope" : "country_aggregate")} AS gsc_scope_status`
@@ -1360,6 +1383,8 @@ function buildSourceMappingDimSql(options = {}) {
       `${sqlString(PROJECT_ID)} AS search_console_project`,
       `${sqlString(gscDataset)} AS search_console_dataset`,
       `${sqlString(`${gscDataset}.searchdata_url_impression`)} AS search_console_table`,
+      `${sqlString(gscSourceMode(market))} AS search_console_source_mode`,
+      `${sqlString(market.gscApiSiteUrl || null)} AS search_console_api_site_url`,
       `${sqlArray(market.gscSiteUrlInclude || [])} AS gsc_site_url_include`,
       `${sqlString(market.gscUrlIncludeRegex || null)} AS gsc_url_include_regex`,
       `${sqlString(market.gscUrlExcludeRegex || null)} AS gsc_url_exclude_regex`,
@@ -1659,9 +1684,14 @@ function buildGscDailySql(options = {}) {
     }
 
     const validationStatus = hasUrlScope ? "pending_looker_validation" : "country_aggregate_pending_url_scope";
+    const sourceMode = gscSourceMode(market);
+    const sourcePrefix =
+      sourceMode === GSC_SOURCE_API_GAPFILL
+        ? "Search Console API gap-fill table; replace with native BigQuery export once available. "
+        : "";
     const notes = hasUrlScope
-      ? `Search Console scoped to ${dataset} with market-level URL regex. Awaiting Looker confirmation.`
-      : `Search Console rolled up at country level (${dataset}). Same value across markets sharing this country until gscUrlIncludeRegex is provided.`;
+      ? `${sourcePrefix}Search Console scoped to ${dataset} with market-level URL regex. Awaiting Looker confirmation.`
+      : `${sourcePrefix}Search Console rolled up at country level (${dataset}). Same value across markets sharing this country until gscUrlIncludeRegex is provided.`;
 
     const commonColumns = [
       `${sqlString(FILTERS_VERSION)} AS filters_version`,
