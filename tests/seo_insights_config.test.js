@@ -250,6 +250,20 @@ assert.ok(
   "Seg BR should expose a market-level Search Console URL scope for SegurPro."
 );
 
+assert.ok(
+  filterSpecsSql
+    .split("\nUNION ALL\n")
+    .find((row) => row.includes("'Avos Tech ES' AS market"))
+    .includes(
+      "'^https?://(www\\\\.)?prosegur\\\\.es/(?:empresas/externalizacion|blog/externalizacion)(?:/|$)' AS gsc_url_include_regex"
+    ) &&
+    filterSpecsSql
+      .split("\nUNION ALL\n")
+      .find((row) => row.includes("'Avos Tech ES' AS market"))
+      .includes("'market_scope' AS gsc_scope_status"),
+  "Avos Tech ES should expose a market-level Search Console URL scope."
+);
+
 const ga4DailySql = seoInsights.buildGa4DailySql();
 const spainGa4DailySql = seoInsights.buildGa4DailySql({ outputDataset: "superform_outputs_286664974" });
 const spainCoverageSql = seoInsights.buildCoverageMatrixSql({ outputDataset: "superform_outputs_286664974" });

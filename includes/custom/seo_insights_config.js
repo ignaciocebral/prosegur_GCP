@@ -615,6 +615,8 @@ const GA4_MARKETS = [
     trafficScope: "organic_search",
     businessTypeIncludeRegex: "avos",
     businessTypeExcludeRegex: null,
+    gscUrlIncludeRegex:
+      "^https?://(www\\.)?prosegur\\.es/(?:empresas/externalizacion|blog/externalizacion)(?:/|$)",
     hostnameInclude: [],
     hostnameExclude: DEFAULT_HOSTNAME_EXCLUDE,
     pageIncludeRegex: null,
