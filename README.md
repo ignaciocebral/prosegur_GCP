@@ -11,7 +11,7 @@ The repo publishes analytics tables from these source families:
 | Area | Main inputs | Main outputs |
 | --- | --- | --- |
 | GA4 core | GA4 BigQuery export datasets | `ga4_events`, `ga4_sessions`, `ga4_transactions` |
-| Paid media | Google Ads transfer, Meta Ads API export, GA4 click/session data | `mart_campaign_performance_daily`, keyword and attribution marts |
+| Paid media | Google Ads transfer, Meta Ads API export, GA4 click/session data | `mart_performance_daily`, keyword and attribution marts |
 | SEO Insights | GA4 organic sessions/events, Search Console, Call Center leads, sales data | `seo_insights_*` tables |
 
 The active deployment target for the SEO Insights work is:

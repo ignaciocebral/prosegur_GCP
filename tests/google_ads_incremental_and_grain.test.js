@@ -15,7 +15,7 @@ const {
 } = require("../includes/custom/marketing_helpers.js");
 
 const campaignPerformanceBaseSql = fs.readFileSync(
-  path.join(__dirname, "..", "definitions", "custom", "02_intermediate", "int_campaign_performance_daily_base.sqlx"),
+  path.join(__dirname, "..", "definitions", "custom", "02_intermediate", "int_performance_daily_base.sqlx"),
   "utf8"
 );
 const customerLookupSql = fs.readFileSync(
@@ -24,6 +24,10 @@ const customerLookupSql = fs.readFileSync(
 );
 const clickMappingSql = fs.readFileSync(
   path.join(__dirname, "..", "definitions", "custom", "02_intermediate", "src_google_ads_click_mapping.sqlx"),
+  "utf8"
+);
+const sessionPaidAttributionSql = fs.readFileSync(
+  path.join(__dirname, "..", "definitions", "custom", "02_intermediate", "int_session_paid_attribution.sqlx"),
   "utf8"
 );
 const sessionKeysSql = fs.readFileSync(
@@ -35,7 +39,7 @@ const metaAdsSql = fs.readFileSync(
   "utf8"
 );
 const googleAdsIdentityAssertionSql = fs.readFileSync(
-  path.join(__dirname, "..", "definitions", "custom", "assertions", "assert_mart_campaign_google_ads_identity_completeness.sqlx"),
+  path.join(__dirname, "..", "definitions", "custom", "assertions", "assert_mart_performance_google_ads_identity_completeness.sqlx"),
   "utf8"
 );
 
@@ -65,7 +69,7 @@ assert.ok(
 );
 
 assert.ok(
-  sessionKeysSql.includes("buildCountryCodeFromNameSql(\"s.geo.country\")") &&
+  sessionKeysSql.includes('buildCountryCodeFromNameSql("s.geo.country")') &&
     sessionKeysSql.includes("dim_seo_insights_source_mapping") &&
     sessionKeysSql.includes("ga4_output_dataset"),
   "GA4 session staging should derive ISO country_code from geo.country for filtering to the mapped release country."
@@ -201,9 +205,27 @@ assert.ok(
 );
 
 assert.ok(
-  campaignPerformanceBaseSql.includes("CAST(NULL AS STRING) AS ad_id") &&
-  campaignPerformanceBaseSql.includes("CAST(NULL AS STRING) AS ad_name"),
-  "Campaign performance base should drop Google ad-level identifiers before joining GA4 aggregates."
+  campaignPerformanceBaseSql.includes("entity_grain") &&
+  campaignPerformanceBaseSql.includes("entity_id") &&
+  campaignPerformanceBaseSql.includes("entity_name") &&
+  campaignPerformanceBaseSql.includes("ga4_attribution_grain"),
+  "Campaign performance base should expose the observed Ads entity grain plus the effective GA4 attribution grain."
+);
+
+assert.ok(
+  campaignPerformanceBaseSql.includes("WHEN ad_id IS NOT NULL THEN 'ad'") &&
+  campaignPerformanceBaseSql.includes("ELSE 'campaign'") &&
+  campaignPerformanceBaseSql.includes("WHEN ad_id IS NOT NULL THEN CAST(ad_id AS STRING)") &&
+  campaignPerformanceBaseSql.includes("ELSE CAST(campaign_id AS STRING)"),
+  "Google Ads observed rows should use ad-level entity IDs when ad_id exists and fall back to campaign for PMax."
+);
+
+assert.ok(
+  campaignPerformanceBaseSql.includes("WHEN platform = 'google_ads' AND normalized_google_ad_id IS NOT NULL THEN 'ad'") &&
+    campaignPerformanceBaseSql.includes("WHEN platform = 'meta_ads' AND normalized_meta_ad_id IS NOT NULL THEN 'ad'") &&
+    campaignPerformanceBaseSql.includes("WHEN COALESCE(normalized_google_ad_group_id, normalized_meta_adset_id) IS NOT NULL THEN 'ad_group_or_adset'") &&
+    campaignPerformanceBaseSql.includes("ELSE 'campaign'"),
+  "GA4 attribution should degrade from ad to ad_group_or_adset to campaign based on the identifiers actually present."
 );
 
 assert.ok(
@@ -214,6 +236,19 @@ assert.ok(
 assert.ok(
   clickMappingSql.includes("acc.account_name"),
   "Click mapping should continue reading the normalized Google Ads account_name column from the customer lookup."
+);
+
+assert.ok(
+  clickMappingSql.includes("click_view_ad_group_ad") &&
+    clickMappingSql.includes("REGEXP_EXTRACT(click_view_ad_group_ad, r'~([0-9]+)$') AS INT64) AS ad_id"),
+  "Click mapping should extract Google Ads ad_id from click_view_ad_group_ad so GCLID joins can reach ad grain."
+);
+
+assert.ok(
+  sessionPaidAttributionSql.includes("c.ad_id") &&
+    sessionPaidAttributionSql.includes("g.ad_id AS google_ad_id") &&
+    sessionPaidAttributionSql.includes("google_ad_id AS ad_id"),
+  "Session paid attribution should propagate Google Ads ad_id into paid_attribution.google_ads."
 );
 
 assert.ok(
@@ -229,9 +264,15 @@ assert.ok(
 );
 
 assert.ok(
-  campaignPerformanceBaseSql.includes("NULLIF(CAST(s.paid_attribution.google_ads.ad_group_id AS STRING), '0')") &&
-    campaignPerformanceBaseSql.includes("NULLIF(CAST(m.paid_attribution.google_ads.ad_group_id AS STRING), '0')"),
-  "Campaign performance GA4 aggregates should normalize Google Ads ad_group_id 0 to NULL so PMax sessions join campaign-grain Ads rows."
+  campaignPerformanceBaseSql.includes("NULLIF(CAST(s.paid_attribution.google_ads.ad_group_id AS STRING), '0') AS normalized_google_ad_group_id"),
+  "Performance entity context should normalize Google Ads ad_group_id 0 to NULL so PMax sessions join campaign-grain Ads rows."
+);
+
+assert.ok(
+  campaignPerformanceBaseSql.includes("CAST(s.paid_attribution.google_ads.ad_id AS STRING) AS normalized_google_ad_id") &&
+    campaignPerformanceBaseSql.includes("WHEN platform = 'google_ads' AND normalized_google_ad_id IS NOT NULL THEN 'ad'") &&
+    campaignPerformanceBaseSql.includes("WHEN platform = 'google_ads' AND normalized_google_ad_id IS NOT NULL THEN normalized_google_ad_id"),
+  "Performance entity context should use Google Ads ad_id from the GCLID bridge before degrading GA4 attribution to ad_group_or_adset."
 );
 
 const googleAdsPmaxSourceKey = {
@@ -291,65 +332,85 @@ const duplicatedGoogleAdsRows = [
   }
 ];
 
-const ga4CampaignAggregate = {
+const adLevelAdsRows = duplicatedGoogleAdsRows.map(row => ({
+  ...row,
+  entity_grain: "ad",
+  entity_id: row.ad_id,
+  ga4_attribution_grain: null,
+  ga4_sessions: 0,
+  ga4_conversions_form: 0
+}));
+
+const ga4FallbackRow = {
   date: "2026-04-21",
   platform: "google_ads",
   campaign_id: "cmp-1",
   ad_group_or_adset_id: "adg-1",
+  ad_id: null,
+  ad_name: null,
+  entity_grain: "ad_group_or_adset",
+  entity_id: "adg-1",
+  ga4_attribution_grain: "ad_group_or_adset",
   ga4_sessions: 3,
-  ga4_conversions_form: 1
+  ga4_conversions_form: 1,
+  spend: 0
 };
 
-const duplicatedLegacyJoin = duplicatedGoogleAdsRows.map(row => ({
-  ...row,
-  ga4_sessions: ga4CampaignAggregate.ga4_sessions,
-  ga4_conversions_form: ga4CampaignAggregate.ga4_conversions_form
-}));
+const optionOneJoinOutput = [...adLevelAdsRows, ga4FallbackRow];
 
 assert.strictEqual(
-  duplicatedLegacyJoin.reduce((total, row) => total + row.ga4_sessions, 0),
-  6,
-  "Keeping Google rows below ad-group grain duplicates one GA4 campaign aggregate across ads."
-);
-
-const aggregatedGoogleRows = [...duplicatedGoogleAdsRows.reduce((groups, row) => {
-  const key = [row.date, row.platform, row.campaign_id, row.ad_group_or_adset_id].join("|");
-  const current = groups.get(key) || {
-    date: row.date,
-    platform: row.platform,
-    campaign_id: row.campaign_id,
-    ad_group_or_adset_id: row.ad_group_or_adset_id,
-    ad_id: null,
-    ad_name: null,
-    spend: 0
-  };
-  current.spend += row.spend;
-  groups.set(key, current);
-  return groups;
-}, new Map()).values()];
-
-const correctedJoin = aggregatedGoogleRows.map(row => ({
-  ...row,
-  ga4_sessions: ga4CampaignAggregate.ga4_sessions,
-  ga4_conversions_form: ga4CampaignAggregate.ga4_conversions_form
-}));
-
-assert.strictEqual(
-  correctedJoin.length,
-  1,
-  "Aggregating Google rows to ad-group grain should collapse duplicate ads before the GA4 join."
-);
-
-assert.strictEqual(
-  correctedJoin[0].ga4_sessions,
+  optionOneJoinOutput.length,
   3,
-  "After the grain fix, the GA4 session aggregate should be attached only once."
+  "The new contract should keep observed ad-level Ads rows and add a separate GA4 fallback row when GA4 only reaches ad-group grain."
 );
 
 assert.strictEqual(
-  correctedJoin[0].ad_id,
-  null,
-  "After aggregation, Google rows should not retain ad_id in the joined output grain."
+  optionOneJoinOutput.filter(row => row.entity_grain === "ad").length,
+  2,
+  "Observed Google Ads rows should keep their ad-level grain when ad_id exists."
+);
+
+assert.strictEqual(
+  optionOneJoinOutput.filter(row => row.ga4_attribution_grain === "ad_group_or_adset").length,
+  1,
+  "GA4 fallback rows should retain the grain actually supported by attribution."
+);
+
+assert.strictEqual(
+  optionOneJoinOutput.reduce((total, row) => total + row.spend, 0),
+  25,
+  "Keeping the ad-level Ads rows should preserve the total observed spend."
+);
+
+assert.strictEqual(
+  optionOneJoinOutput.reduce((total, row) => total + row.ga4_sessions, 0),
+  3,
+  "GA4 fallback rows should contribute sessions only once without duplicating them across ads."
+);
+
+assert.deepStrictEqual(
+  optionOneJoinOutput.map(row => [row.entity_grain, row.entity_id]),
+  [
+    ["ad", "ad-1"],
+    ["ad", "ad-2"],
+    ["ad_group_or_adset", "adg-1"]
+  ],
+  "entity_grain and entity_id should clearly identify both observed Ads rows and fallback GA4 rows."
+);
+
+assert.ok(
+  campaignPerformanceBaseSql.includes("ARRAY_AGG(ctx.ad_name IGNORE NULLS LIMIT 1)[SAFE_OFFSET(0)]"),
+  "GA4 entity aggregation should prefer a non-null ad_name instead of using names to fragment the entity grain."
+);
+
+assert.ok(
+  campaignPerformanceBaseSql.includes("ARRAY_AGG(ctx.entity_name IGNORE NULLS LIMIT 1)[SAFE_OFFSET(0)]"),
+  "GA4 entity aggregation should prefer a non-null entity_name instead of grouping by descriptive labels."
+);
+
+assert.ok(
+  campaignPerformanceBaseSql.includes("GROUP BY 1, 2, 3, 4, 6, 8, 10, 13, 14, 16"),
+  "GA4 entity aggregation should group by real keys only, including ga4_attribution_grain."
 );
 
 console.log("marketing helpers google ads regression tests passed");

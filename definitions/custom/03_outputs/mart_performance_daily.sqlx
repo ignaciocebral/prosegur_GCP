@@ -1,6 +1,6 @@
 /*
 """
-Description: Reporting mart for unified cross-platform campaign performance.
+Description: Reporting mart for unified cross-platform paid-media performance.
 Author: Codex
 Date: 2026-04-21
 Purpose: Production
@@ -12,7 +12,7 @@ config {
   type: "incremental",
   schema: dataform.projectConfig.vars.OUTPUTS_DATASET,
   tags: [dataform.projectConfig.vars.LABEL_EXECUTION_OPERATION, "performance", "campaigns", "mart"],
-  description: "Thin reporting mart over the normalized campaign staging base. Keeps the key campaign-platform metrics and reporting ratios.",
+  description: "Thin reporting mart over the normalized paid-media staging base. Exposes entity_grain/entity_id while keeping hybrid Ads plus GA4 metrics and preserving observed Ads detail.",
   bigquery: {
     partitionBy: "date",
     clusterBy: ["platform", "country_code", "campaign_id"]
@@ -71,7 +71,7 @@ SELECT
   SAFE_DIVIDE(b.platform_conversions_total, NULLIF(b.clicks, 0)) AS conversion_rate_platform,
   SAFE_DIVIDE(b.ga4_total_leads, NULLIF(b.ga4_sessions, 0)) AS conversion_rate_ga4,
   SAFE_DIVIDE(b.platform_conversions_total, NULLIF(b.ga4_total_leads, 0)) AS platform_vs_ga4_ratio
-FROM ${ref("int_campaign_performance_daily_base")} b
+FROM ${ref("int_performance_daily_base")} b
 WHERE b.date >= date_checkpoint
   AND b.country_code IN (
     SELECT DISTINCT country_code

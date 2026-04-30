@@ -2,7 +2,7 @@ config {
   type: "assertion",
   schema: dataform.projectConfig.vars.QUALITY_DATASET,
   tags: [dataform.projectConfig.vars.LABEL_EXECUTION_OPERATION, "google_ads", "quality", "campaigns"],
-  description: "Fails when Google Ads campaign mart rows have a campaign_id but no Ads account identity."
+  description: "Fails when Google Ads performance mart rows have a campaign_id but no Ads account identity."
 }
 
 SELECT
@@ -20,7 +20,7 @@ SELECT
   platform_conversions_total,
   ga4_sessions,
   ga4_total_leads
-FROM ${ref("mart_campaign_performance_daily")}
+FROM ${ref("mart_performance_daily")}
 WHERE platform = 'google_ads'
   AND campaign_id IS NOT NULL
   AND (

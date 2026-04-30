@@ -12,7 +12,7 @@ config {
   type: "incremental",
   schema: dataform.projectConfig.vars.OUTPUTS_DATASET,
   tags: [dataform.projectConfig.vars.LABEL_EXECUTION_OPERATION, "attribution", "sessions", "mart"],
-  description: "Final session mart. Grain: 1 row per session_id. Includes GA4 raw attribution, GA4 last non-direct attribution, canonical channel fields (channel, matched_platform, match_method), landing page fields, and paid-media match detail. Campaign-platform metrics such as impressions, clicks, and spend live in mart_campaign_performance_daily, not here.",
+  description: "Final session mart. Grain: 1 row per session_id. Includes GA4 raw attribution, GA4 last non-direct attribution, canonical channel fields (channel, matched_platform, match_method), landing page fields, and paid-media match detail. Campaign-platform metrics such as impressions, clicks, and spend live in mart_performance_daily, not here.",
   columns: require("includes/custom/documentation/helpers.js").martSessionAttributionEnriched,
   bigquery: {
     partitionBy: "session_date",

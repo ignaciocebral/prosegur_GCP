@@ -2,7 +2,7 @@ config {
   type: "assertion",
   schema: dataform.projectConfig.vars.QUALITY_DATASET,
   tags: [dataform.projectConfig.vars.LABEL_EXECUTION_OPERATION, "quality", "country_isolation"],
-  description: "Fails when campaign performance rows are materialized outside the country_code mapped to the current release config output dataset."
+  description: "Fails when performance mart rows are materialized outside the country_code mapped to the current release config output dataset."
 }
 
 WITH release_country AS (
@@ -14,7 +14,7 @@ WITH release_country AS (
 SELECT
   country_code,
   COUNT(*) AS row_count
-FROM ${ref("mart_campaign_performance_daily")}
+FROM ${ref("mart_performance_daily")}
 WHERE country_code IS NULL
   OR country_code NOT IN (SELECT country_code FROM release_country)
 GROUP BY 1

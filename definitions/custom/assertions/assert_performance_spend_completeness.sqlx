@@ -1,6 +1,6 @@
 /*
 """
-Description: Verifies that total spend in mart_campaign_performance_daily matches source tables.
+Description: Verifies that total spend in mart_performance_daily matches source tables.
 Author: Codex
 Date: 2026-04-21
 Purpose: Production
@@ -11,14 +11,14 @@ Retention: Permanent - Quality gate for spend data completeness.
 config {
   type: "assertion",
   tags: [dataform.projectConfig.vars.LABEL_EXECUTION_OPERATION, "quality", "spend"],
-  description: "Asserts that total spend in the campaign performance mart matches the sum of spend in src_google_ads_performance (Google) and src_meta_ads_ad_daily (Meta) within a 1% tolerance."
+  description: "Asserts that total spend in the performance daily mart matches the sum of spend in src_google_ads_performance (Google) and src_meta_ads_ad_daily (Meta) within a 1% tolerance."
 }
 
 WITH mart_spend AS (
   SELECT
     platform,
     SUM(spend) AS total_spend
-  FROM ${ref("mart_campaign_performance_daily")}
+  FROM ${ref("mart_performance_daily")}
   GROUP BY 1
 ),
 
