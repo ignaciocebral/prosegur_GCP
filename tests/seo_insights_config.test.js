@@ -21,8 +21,10 @@ assert.ok(
   sourceMappingSql.includes("AS ga4_property_id") &&
     sourceMappingSql.includes("AS google_ads_customer_id") &&
     sourceMappingSql.includes("AS meta_ads_account_names") &&
-    sourceMappingSql.includes("AS search_console_dataset"),
-  "The SEO source mapping dim should expose GA4, Google Ads, Meta Ads, and Search Console mapping columns."
+    sourceMappingSql.includes("AS search_console_dataset") &&
+    sourceMappingSql.includes("AS search_console_source_mode") &&
+    sourceMappingSql.includes("AS search_console_api_site_url"),
+  "The SEO source mapping dim should expose GA4, Google Ads, Meta Ads, and Search Console mapping columns, including temporary API gap-fill metadata."
 );
 
 assert.ok(
@@ -49,6 +51,36 @@ assert.deepStrictEqual(
   },
   "Additional GA4 output datasets should carry the Google Ads customer IDs currently available in the PRO MCC transfer."
 );
+
+for (const [market, dataset, siteUrl] of [
+  ["Cash MX", "searchconsole_mx", "sc-domain:grupoprosegur.com.mx"],
+  ["Cash HN", "searchconsole_hn", "sc-domain:prosegur.hn"],
+  ["Cash CR", "searchconsole_cr", "sc-domain:prosegur.cr"],
+  ["Cash GT", "searchconsole_gt", "sc-domain:prosegur.gt"]
+]) {
+  const mappingRow = sourceMappingSql
+    .split("\nUNION ALL\n")
+    .find((row) => row.includes(`'${market}' AS market`));
+  const filterRow = filterSpecsSql
+    .split("\nUNION ALL\n")
+    .find((row) => row.includes(`'${market}' AS market`));
+
+  assert.ok(
+    mappingRow &&
+      mappingRow.includes(`'${dataset}' AS search_console_dataset`) &&
+      mappingRow.includes("'search_console_api_gapfill' AS search_console_source_mode") &&
+      mappingRow.includes(`'${siteUrl}' AS search_console_api_site_url`),
+    `${market} should be mapped to its temporary Search Console API gap-fill dataset.`
+  );
+
+  assert.ok(
+    filterRow &&
+      filterRow.includes("'api_gapfill_pending_looker_validation' AS filter_validation_status") &&
+      filterRow.includes("'search_console_api_gapfill' AS gsc_source_mode") &&
+      filterRow.includes(`'${siteUrl}' AS gsc_api_site_url`),
+    `${market} should expose API gap-fill status in the filter specs.`
+  );
+}
 
 assert.ok(
   filterSpecsSql
@@ -307,9 +339,14 @@ assert.ok(
 );
 
 assert.ok(
-  mexicoGscDailySql.includes("FROM UNNEST([]) AS _empty") &&
-    unknownMappingSql.includes("FROM UNNEST([]) AS _empty"),
-  "Markets without a Search Console export, and unknown output datasets, should compile empty instead of referencing missing tables."
+  mexicoGscDailySql.includes("searchconsole_mx.searchdata_url_impression") &&
+    mexicoGscDailySql.includes("'Cash MX' AS market"),
+  "Cash MX GSC daily SQL should read from the API gap-fill dataset searchconsole_mx until the native export lands."
+);
+
+assert.ok(
+  unknownMappingSql.includes("FROM UNNEST([]) AS _empty"),
+  "Unknown output datasets should compile empty instead of referencing missing tables."
 );
 
 console.log("seo insights config regression tests passed");
