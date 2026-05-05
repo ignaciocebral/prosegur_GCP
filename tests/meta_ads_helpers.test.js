@@ -9,6 +9,8 @@ const {
 } = require("../includes/custom/marketing_helpers.js");
 const {
   buildMetaAdsConversionBucketSql,
+  buildMetaAdsIgnoredConversionSql,
+  META_ADS_IGNORED_CONVERSION_NAMES,
   META_ADS_REVIEW_CONVERSION_NAMES
 } = require("../includes/custom/marketing_helpers.js");
 
@@ -123,8 +125,21 @@ assert.ok(
 );
 
 assert.ok(
-  META_ADS_REVIEW_CONVERSION_NAMES.includes("CompleteRegistration"),
-  "Meta review exclusions should keep unresolved live-only events out of the mapping assertion."
+  META_ADS_IGNORED_CONVERSION_NAMES.includes("CompleteRegistration"),
+  "Meta ignored exclusions should keep unresolved live-only events out of lead conversion totals."
+);
+
+assert.strictEqual(
+  META_ADS_REVIEW_CONVERSION_NAMES,
+  META_ADS_IGNORED_CONVERSION_NAMES,
+  "The legacy Meta review export should remain an alias for ignored conversion names."
+);
+
+const metaIgnoredSql = buildMetaAdsIgnoredConversionSql("c.name");
+assert.ok(
+  metaIgnoredSql.includes("CompleteRegistration") &&
+    metaIgnoredSql.includes("offsite_conversion.fb_pixel_custom.Lead_60s/50%"),
+  "Meta ignored conversion SQL should be reusable in source totals and coverage assertions."
 );
 
 console.log("marketing helpers meta ads regression tests passed");

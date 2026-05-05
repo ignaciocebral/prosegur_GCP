@@ -26,10 +26,14 @@ js {
     buildMetaAccountFilterSql,
     buildMetaIncrementalDateCheckpointSql
   } = require("includes/custom/marketing_helpers.js");
-  const { buildMetaAdsConversionBucketSql } = require("includes/custom/marketing_helpers.js");
+  const {
+    buildMetaAdsConversionBucketSql,
+    buildMetaAdsIgnoredConversionSql
+  } = require("includes/custom/marketing_helpers.js");
   const metaAccountNamesRaw = dataform.projectConfig.vars.META_ADS_ACCOUNT_NAMES || "";
   const metaAccountFilterSql = buildMetaAccountFilterSql(metaAccountNamesRaw, "account");
   const metaConversionBuckets = buildMetaAdsConversionBucketSql("c.name");
+  const metaIgnoredConversionsSql = buildMetaAdsIgnoredConversionSql("c.name");
 }
 
 pre_operations {
@@ -101,7 +105,8 @@ SELECT
             WHERE ${metaConversionBuckets.noCualificado}), 0) AS conversions_no_cualificado,
   COALESCE((SELECT SUM(c.count) FROM UNNEST(ai.conversions) c
             WHERE ${metaConversionBuckets.cualificadoNegativo}), 0) AS conversions_cualificado_negativo,
-  COALESCE((SELECT SUM(c.count) FROM UNNEST(ai.conversions) c), 0) AS conversions_total
+  COALESCE((SELECT SUM(c.count) FROM UNNEST(ai.conversions) c
+            WHERE NOT (${metaIgnoredConversionsSql})), 0) AS conversions_total
 FROM ${ref("ad_insights")} ai
 LEFT JOIN account_lookup al
   ON ai.account = al.account_name

@@ -2,7 +2,7 @@ config {
   type: "incremental",
   schema: dataform.projectConfig.vars.TRANSFORMATIONS_DATASET,
   tags: ["marketing", "google_ads"],
-  description: "Google Ads source-normalized mapping table to decode GCLIDs into campaign, ad group, and account names.",
+  description: "Google Ads source-normalized mapping table to decode GCLIDs into campaign, ad group, ad, and account names.",
   bigquery: {
     partitionBy: "date",
     clusterBy: ["gclid"]
@@ -27,6 +27,7 @@ WITH unique_clicks AS (
     click_view_gclid AS gclid,
     campaign_id,
     ad_group_id,
+    SAFE_CAST(REGEXP_EXTRACT(click_view_ad_group_ad, r'~([0-9]+)$') AS INT64) AS ad_id,
     customer_id,
     segments_date as date,
     click_view_keyword AS keyword_text,
@@ -67,6 +68,7 @@ SELECT
   cmp.campaign_name,
   c.ad_group_id,
   ag.ad_group_name,
+  c.ad_id,
   c.customer_id,
   acc.account_name,
   c.keyword_text,

@@ -6,6 +6,9 @@
 - Treat `Programming/projects/prosegur_GCP/` as legacy fallback only.
 - Keep `node_modules/` out of source control and regenerate locally when needed.
 - Any workflow doc that still points to the Programming path should be updated during the cutover.
+- Prefer Windows `cmd` for CLI shims when PowerShell execution policy blocks `.ps1` wrappers.
+- At the start of every Codex session in this project, run a read-only git alignment check and report whether the local repo and remote repo are aligned.
+- That startup git check must not perform `pull`, `push`, or `commit`.
 - Before branch review, merge-readiness checks, PR validation, or cleanup, fetch/prune and verify local and remote alignment. Do not infer branch status from stale local refs.
 - Before deleting any branch, inspect linked worktrees and confirm whether the work is merged or superseded on the remote. Remove worktrees before deleting their linked branches.
 
