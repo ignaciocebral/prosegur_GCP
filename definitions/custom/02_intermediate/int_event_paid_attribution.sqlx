@@ -1,21 +1,21 @@
 /*
 """
-Description: Cookieless GA4 event-level performance aggregation for paid-media reporting.
+Description: Event-grain GA4 paid-media attribution for consented and cookieless events.
 Author: Codex
 Date: 2026-05-04
 Purpose: Production
-Retention: Permanent - Parallel GA4 event path for consent-limited hits that cannot become GA4 sessions.
+Retention: Permanent - Event-level paid attribution layer independent from sessionization.
 """
 */
 
 config {
   type: "incremental",
   schema: dataform.projectConfig.vars.TRANSFORMATIONS_DATASET,
-  tags: [dataform.projectConfig.vars.LABEL_EXECUTION_OPERATION, "performance", "ga4", "cookieless", "staging"],
-  description: "Aggregates cookieless GA4 events to paid-media performance grain using event-level traffic parameters when campaign/ad identifiers are still available.",
+  tags: [dataform.projectConfig.vars.LABEL_EXECUTION_OPERATION, "attribution", "events", "ga4", "paid_media", "staging"],
+  description: "Attributes GA4 events to paid-media entities using event-level click IDs and URL/UTM parameters, including both consented and cookieless events.",
   bigquery: {
     partitionBy: "date",
-    clusterBy: ["platform", "country_code", "campaign_id"]
+    clusterBy: ["platform", "country_code", "campaign_id", "event_identity_status"]
   }
 }
 
@@ -35,13 +35,7 @@ pre_operations {
     )}
   );
   ${when(incremental(),
-    `ALTER TABLE ${self()} ADD COLUMN IF NOT EXISTS meta_link_clicks INT64;
-     BEGIN
-       ALTER TABLE ${self()} DROP COLUMN link_clicks;
-     EXCEPTION WHEN ERROR THEN
-       SET date_checkpoint = date_checkpoint;
-     END;
-     DELETE FROM ${self()} WHERE date >= date_checkpoint`
+    `DELETE FROM ${self()} WHERE date >= date_checkpoint`
   )}
 }
 
@@ -58,6 +52,7 @@ event_scope AS (
     (SELECT country_code FROM release_country) AS country_code,
     e.event_name,
     e.time.event_timestamp_utc AS event_timestamp_utc,
+    IF(e.session_id IS NULL OR e.user_pseudo_id IS NULL, 'cookieless', 'cookie_identified') AS event_identity_status,
     e.page.location AS page_location,
     e.page.path AS page_path,
     COALESCE(
@@ -102,16 +97,13 @@ event_scope AS (
       LOWER(COALESCE(e.page.location, e.page.path, '')),
       r'alarm'
     ) AS is_meta_matching_excluded_url,
-    COALESCE(e.click_ids.gclid, e.collected_traffic_source.gclid) AS event_gclid,
-    NULLIF(CAST(e.session_traffic_source_last_click.google_ads_campaign.customer_id AS STRING), '0') AS event_google_customer_id,
-    e.session_traffic_source_last_click.google_ads_campaign.account_name AS event_google_account_name,
-    NULLIF(CAST(e.session_traffic_source_last_click.google_ads_campaign.campaign_id AS STRING), '0') AS event_google_campaign_id,
-    e.session_traffic_source_last_click.google_ads_campaign.campaign_name AS event_google_campaign_name,
-    NULLIF(CAST(e.session_traffic_source_last_click.google_ads_campaign.ad_group_id AS STRING), '0') AS event_google_ad_group_id,
-    e.session_traffic_source_last_click.google_ads_campaign.ad_group_name AS event_google_ad_group_name
+    COALESCE(
+      e.click_ids.gclid,
+      e.collected_traffic_source.gclid,
+      NULLIF(LOWER(REGEXP_EXTRACT(e.page.location, r"[?&]gclid=([^&#]+)")), '')
+    ) AS event_gclid
   FROM ${ref("ga4_events")} e
   WHERE e.event_date >= date_checkpoint
-    AND e.session_id IS NULL
 ),
 
 google_perf AS (
@@ -203,36 +195,39 @@ google_context AS (
     e.date,
     e.country_code,
     e.event_name,
+    e.event_timestamp_utc,
+    e.event_identity_status,
+    CASE
+      WHEN g.gclid IS NOT NULL THEN 'google_gclid'
+      WHEN gc.campaign_id IS NOT NULL THEN 'google_campaign_id'
+      ELSE 'google_utm_fallback'
+    END AS event_match_method,
     'google_ads' AS platform,
     COALESCE(
       g.customer_id,
-      e.event_google_customer_id,
       gc.customer_id,
       CAST(${dataform.projectConfig.vars.GOOGLE_ADS_CUSTOMER_ID} AS STRING)
     ) AS account_id,
     COALESCE(
       g.account_name,
-      e.event_google_account_name,
       gc.account_name,
       CAST(${dataform.projectConfig.vars.GOOGLE_ADS_CUSTOMER_ID} AS STRING)
     ) AS account_name,
     COALESCE(
       g.campaign_id,
-      e.event_google_campaign_id,
       gc.campaign_id,
       e.landing_google_campaign_id,
       e.traffic_campaign_id
     ) AS campaign_id,
     COALESCE(
       g.campaign_name,
-      e.event_google_campaign_name,
       gc.campaign_name,
       e.campaign,
       e.landing_google_campaign_id,
       e.traffic_campaign_id
     ) AS campaign_name,
-    NULLIF(COALESCE(g.ad_group_id, e.event_google_ad_group_id), '0') AS normalized_google_ad_group_id,
-    COALESCE(g.ad_group_name, e.event_google_ad_group_name) AS normalized_google_ad_group_name,
+    NULLIF(g.ad_group_id, '0') AS normalized_google_ad_group_id,
+    g.ad_group_name AS normalized_google_ad_group_name,
     NULLIF(g.ad_id, '0') AS normalized_google_ad_id,
     CAST(NULL AS STRING) AS normalized_meta_adset_id,
     CAST(NULL AS STRING) AS normalized_meta_adset_name,
@@ -244,7 +239,6 @@ google_context AS (
     AND e.date = g.date
   LEFT JOIN google_campaign_lookup gc
     ON COALESCE(
-      e.event_google_campaign_id,
       e.landing_google_campaign_id,
       CASE
         WHEN REGEXP_CONTAINS(COALESCE(e.traffic_campaign_id, ''), r'^[0-9]+$') THEN e.traffic_campaign_id
@@ -252,7 +246,6 @@ google_context AS (
       END
     ) = gc.campaign_id
   WHERE g.gclid IS NOT NULL
-    OR e.event_google_campaign_id IS NOT NULL
     OR (
       LOWER(COALESCE(e.source, '')) IN ('google', 'google_ads', 'google_paid', 'adwords', 'google.com')
       AND REGEXP_CONTAINS(LOWER(COALESCE(e.medium, '')), r'(cpc|ppc|paid|sem|demandgen|display|pmax)')
@@ -267,7 +260,6 @@ google_context AS (
     PARTITION BY e.event_id
     ORDER BY
       IF(g.gclid IS NOT NULL, 1, 0) DESC,
-      IF(e.event_google_campaign_id IS NOT NULL, 1, 0) DESC,
       IF(gc.campaign_id IS NOT NULL, 1, 0) DESC,
       IF(e.landing_google_campaign_id IS NOT NULL, 1, 0) DESC,
       gc.campaign_id DESC
@@ -304,6 +296,13 @@ meta_context AS (
     e.date,
     e.country_code,
     e.event_name,
+    e.event_timestamp_utc,
+    e.event_identity_status,
+    CASE
+      WHEN e.landing_campaign_id IS NOT NULL THEN 'meta_url_ids'
+      WHEN mc.campaign_id IS NOT NULL THEN 'meta_name_fallback'
+      ELSE 'meta_utm_fallback'
+    END AS event_match_method,
     'meta_ads' AS platform,
     COALESCE(mc.account_id, ${primaryMetaAccountNameSql}) AS account_id,
     COALESCE(mc.account_name, ${primaryMetaAccountNameSql}) AS account_name,
@@ -359,18 +358,21 @@ meta_context AS (
   ) = 1
 ),
 
-cookieless_base_context AS (
+event_base_context AS (
   SELECT * FROM google_context
   UNION ALL
   SELECT * FROM meta_context
 ),
 
-cookieless_entity_context AS (
+event_entity_context AS (
   SELECT
     event_id,
     date,
     country_code,
     event_name,
+    event_timestamp_utc,
+    event_identity_status,
+    event_match_method,
     platform,
     account_id,
     account_name,
@@ -426,72 +428,34 @@ cookieless_entity_context AS (
       WHEN platform = 'meta_ads' AND normalized_meta_adset_id IS NOT NULL THEN 'ad_group_or_adset'
       ELSE 'campaign'
     END AS ga4_attribution_grain
-  FROM cookieless_base_context
+  FROM event_base_context
 )
 
 SELECT
+  event_id,
   date,
+  event_timestamp_utc,
   platform,
   country_code,
+  event_name,
+  event_identity_status,
+  event_match_method,
   account_id,
-  COALESCE(
-    ARRAY_AGG(account_name IGNORE NULLS LIMIT 1)[SAFE_OFFSET(0)],
-    account_id
-  ) AS account_name,
+  COALESCE(account_name, account_id) AS account_name,
   campaign_id,
-  COALESCE(
-    ARRAY_AGG(campaign_name IGNORE NULLS LIMIT 1)[SAFE_OFFSET(0)],
-    campaign_id
-  ) AS campaign_name,
+  COALESCE(campaign_name, campaign_id) AS campaign_name,
   ad_group_or_adset_id,
-  COALESCE(
-    ARRAY_AGG(ad_group_or_adset_name IGNORE NULLS LIMIT 1)[SAFE_OFFSET(0)],
-    ad_group_or_adset_id
-  ) AS ad_group_or_adset_name,
+  COALESCE(ad_group_or_adset_name, ad_group_or_adset_id) AS ad_group_or_adset_name,
   CASE
     WHEN ga4_attribution_grain = 'ad' THEN ad_id
     ELSE CAST(NULL AS STRING)
   END AS ad_id,
   CASE
-    WHEN ga4_attribution_grain = 'ad' THEN COALESCE(
-      ARRAY_AGG(ad_name IGNORE NULLS LIMIT 1)[SAFE_OFFSET(0)],
-      ARRAY_AGG(ad_id IGNORE NULLS LIMIT 1)[SAFE_OFFSET(0)]
-    )
+    WHEN ga4_attribution_grain = 'ad' THEN COALESCE(ad_name, ad_id)
     ELSE CAST(NULL AS STRING)
   END AS ad_name,
-  CAST(NULL AS BOOL) AS is_pmax,
   entity_grain,
   entity_id,
-  COALESCE(
-    ARRAY_AGG(entity_name IGNORE NULLS LIMIT 1)[SAFE_OFFSET(0)],
-    entity_id
-  ) AS entity_name,
-  ga4_attribution_grain,
-  'cookieless' AS ga4_event_identity_status,
-  CAST(0 AS INT64) AS impressions,
-  CAST(0 AS INT64) AS clicks,
-  CAST(0 AS INT64) AS meta_link_clicks,
-  CAST(0 AS FLOAT64) AS spend,
-  CAST(0 AS FLOAT64) AS platform_conversions_form,
-  CAST(0 AS FLOAT64) AS platform_conversions_call,
-  CAST(0 AS FLOAT64) AS platform_conversions_crm,
-  CAST(0 AS FLOAT64) AS platform_conversions_visita,
-  CAST(0 AS FLOAT64) AS platform_conversions_no_gestionado,
-  CAST(0 AS FLOAT64) AS platform_conversions_no_cualificado,
-  CAST(0 AS FLOAT64) AS platform_conversions_cualificado_negativo,
-  CAST(0 AS FLOAT64) AS platform_conversions_total,
-  CAST(0 AS FLOAT64) AS platform_conversions_value,
-  CAST(0 AS INT64) AS ga4_sessions,
-  CAST(0 AS INT64) AS ga4_users,
-  CAST(0 AS INT64) AS ga4_engaged_sessions,
-  COUNT(DISTINCT event_id) AS ga4_events,
-  COUNTIF(REGEXP_CONTAINS(LOWER(event_name), r'cmb')) AS ga4_conversions_cmb,
-  COUNTIF(
-    REGEXP_CONTAINS(LOWER(event_name), r'form')
-    AND NOT REGEXP_CONTAINS(LOWER(event_name), r'formulario')
-  ) AS ga4_conversions_form,
-  COUNTIF(REGEXP_CONTAINS(LOWER(event_name), r'c2c')) AS ga4_conversions_c2c,
-  COUNTIF(event_name = 'generate_lead' OR LOWER(event_name) = 'generate_lead_crm') AS ga4_conversions_generate_lead,
-  COUNTIF(event_name = 'page_view') AS ga4_page_views
-FROM cookieless_entity_context
-GROUP BY 1, 2, 3, 4, 6, 8, 10, 12, 13, 14, 16, 17
+  COALESCE(entity_name, entity_id) AS entity_name,
+  ga4_attribution_grain
+FROM event_entity_context

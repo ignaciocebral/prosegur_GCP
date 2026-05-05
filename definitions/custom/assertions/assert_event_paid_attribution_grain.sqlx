@@ -1,0 +1,14 @@
+config {
+  type: "assertion",
+  schema: dataform.projectConfig.vars.QUALITY_DATASET,
+  tags: [dataform.projectConfig.vars.LABEL_EXECUTION_OPERATION, "quality", "attribution", "events"],
+  description: "Fails when event paid attribution has duplicate rows for the same GA4 event and paid platform."
+}
+
+SELECT
+  event_id,
+  platform,
+  COUNT(*) AS duplicate_rows
+FROM ${ref("int_event_paid_attribution")}
+GROUP BY 1, 2
+HAVING COUNT(*) > 1
