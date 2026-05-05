@@ -12,7 +12,7 @@ config {
   type: "incremental",
   schema: dataform.projectConfig.vars.OUTPUTS_DATASET,
   tags: [dataform.projectConfig.vars.LABEL_EXECUTION_OPERATION, "performance", "campaigns", "mart"],
-  description: "Thin reporting mart over the normalized paid-media staging base. Exposes canonical entity_id/entity_name while keeping hybrid Ads plus GA4 metrics and preserving observed Ads detail.",
+  description: "Thin reporting mart over the normalized paid-media staging base. Exposes business-readable campaign/adset/ad hierarchy labels with explicit not-identified fallbacks, while retaining technical IDs and attribution grain fields for stable joins, QA, and semantic-layer guardrails.",
   bigquery: {
     partitionBy: "date",
     clusterBy: ["platform", "country_code", "campaign_id"]
@@ -76,11 +76,11 @@ SELECT
   b.account_id,
   b.account_name,
   b.campaign_id,
-  b.campaign_name,
+  COALESCE(b.campaign_name, '(sin campaña identificada)') AS campaign_name,
   b.ad_group_or_adset_id,
-  b.ad_group_or_adset_name,
+  COALESCE(b.ad_group_or_adset_name, '(sin adset identificado)') AS ad_group_or_adset_name,
   b.ad_id,
-  b.ad_name,
+  COALESCE(b.ad_name, '(sin anuncio identificado)') AS ad_name,
   b.is_pmax,
   b.entity_id,
   b.entity_name,

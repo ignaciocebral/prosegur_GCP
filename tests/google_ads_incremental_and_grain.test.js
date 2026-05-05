@@ -305,6 +305,13 @@ assert.ok(
 );
 
 assert.ok(
+  campaignPerformanceMartSelectSql.includes("COALESCE(b.campaign_name, '(sin campaña identificada)') AS campaign_name") &&
+    campaignPerformanceMartSelectSql.includes("COALESCE(b.ad_group_or_adset_name, '(sin adset identificado)') AS ad_group_or_adset_name") &&
+    campaignPerformanceMartSelectSql.includes("COALESCE(b.ad_name, '(sin anuncio identificado)') AS ad_name"),
+  "Performance mart should expose business-readable hierarchy labels with explicit not-identified fallbacks for Looker consumers."
+);
+
+assert.ok(
   campaignPerformanceBaseSql.includes("WHEN NULLIF(CAST(ad_id AS STRING), '0') IS NOT NULL THEN 'ad'") &&
   campaignPerformanceBaseSql.includes("ELSE 'campaign'") &&
   campaignPerformanceBaseSql.includes("NULLIF(CAST(ad_id AS STRING), '0') AS ad_id") &&
