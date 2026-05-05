@@ -1,0 +1,20 @@
+/*
+"""
+Description: Backward-compatible view for the previous campaign performance mart name.
+Author: Codex
+Date: 2026-05-05
+Purpose: Production
+Retention: Permanent - Compatibility layer for existing downstream consumers.
+"""
+*/
+
+config {
+  type: "view",
+  schema: dataform.projectConfig.vars.OUTPUTS_DATASET,
+  tags: [dataform.projectConfig.vars.LABEL_EXECUTION_OPERATION, "performance", "campaigns", "mart", "compatibility"],
+  description: "Compatibility view preserving the legacy mart_campaign_performance_daily contract while mart_performance_daily becomes the canonical paid-media performance mart."
+}
+
+SELECT
+  *
+FROM ${ref("mart_performance_daily")}
