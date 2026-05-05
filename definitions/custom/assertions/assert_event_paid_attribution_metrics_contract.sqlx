@@ -1,0 +1,34 @@
+config {
+  type: "assertion",
+  schema: dataform.projectConfig.vars.QUALITY_DATASET,
+  tags: [dataform.projectConfig.vars.LABEL_EXECUTION_OPERATION, "quality", "performance", "events"],
+  description: "Fails when the event performance mart breaks the event-only metric contract."
+}
+
+-- Event performance is intentionally independent from session and platform delivery
+-- metrics. This assertion checks the event counters that the mart does expose.
+SELECT
+  CASE
+    WHEN ga4_events <= 0 THEN 'non_positive_ga4_events'
+    WHEN ga4_events < ga4_page_views THEN 'page_views_greater_than_events'
+    WHEN ga4_events < ga4_total_leads THEN 'leads_greater_than_events'
+    ELSE 'unknown_event_metrics_contract_violation'
+  END AS failure_reason,
+  date,
+  platform,
+  country_code,
+  event_identity_status,
+  event_match_method,
+  account_id,
+  campaign_id,
+  ad_group_or_adset_id,
+  ad_id,
+  entity_id,
+  ga4_attribution_grain,
+  ga4_events,
+  ga4_page_views,
+  ga4_total_leads
+FROM ${ref("mart_event_performance_daily")}
+WHERE ga4_events <= 0
+  OR ga4_events < ga4_page_views
+  OR ga4_events < ga4_total_leads

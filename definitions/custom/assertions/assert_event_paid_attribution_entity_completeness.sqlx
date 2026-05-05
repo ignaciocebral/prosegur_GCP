@@ -1,0 +1,33 @@
+config {
+  type: "assertion",
+  schema: dataform.projectConfig.vars.QUALITY_DATASET,
+  tags: [dataform.projectConfig.vars.LABEL_EXECUTION_OPERATION, "quality", "attribution", "events"],
+  description: "Fails when paid GA4 event attribution rows are missing entity_id or entity_name."
+}
+
+SELECT
+  CASE
+    WHEN entity_id IS NULL AND entity_name IS NULL THEN 'missing_entity_id_and_entity_name'
+    WHEN entity_id IS NULL THEN 'missing_entity_id'
+    WHEN entity_name IS NULL THEN 'missing_entity_name'
+    ELSE 'unknown_entity_completeness_violation'
+  END AS failure_reason,
+  date,
+  platform,
+  country_code,
+  account_id,
+  account_name,
+  campaign_id,
+  campaign_name,
+  ad_group_or_adset_id,
+  ad_group_or_adset_name,
+  ad_id,
+  ad_name,
+  entity_id,
+  entity_name,
+  ga4_attribution_grain,
+  event_identity_status,
+  event_match_method
+FROM ${ref("int_event_paid_attribution")}
+WHERE platform IN ('google_ads', 'meta_ads')
+  AND (entity_id IS NULL OR entity_name IS NULL)

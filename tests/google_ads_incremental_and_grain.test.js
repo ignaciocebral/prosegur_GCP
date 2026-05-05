@@ -18,8 +18,12 @@ const campaignPerformanceBaseSql = fs.readFileSync(
   path.join(__dirname, "..", "definitions", "custom", "02_intermediate", "int_performance_daily_base.sqlx"),
   "utf8"
 );
-const cookielessPerformanceSql = fs.readFileSync(
-  path.join(__dirname, "..", "definitions", "custom", "02_intermediate", "int_ga4_cookieless_performance_daily.sqlx"),
+const eventPaidAttributionSql = fs.readFileSync(
+  path.join(__dirname, "..", "definitions", "custom", "02_intermediate", "int_event_paid_attribution.sqlx"),
+  "utf8"
+);
+const eventPerformanceMartSql = fs.readFileSync(
+  path.join(__dirname, "..", "definitions", "custom", "03_outputs", "mart_event_performance_daily.sqlx"),
   "utf8"
 );
 const campaignPerformanceMartSql = fs.readFileSync(
@@ -58,24 +62,24 @@ const performanceEntityNameAssertionSql = fs.readFileSync(
   path.join(__dirname, "..", "definitions", "custom", "assertions", "assert_mart_performance_entity_name_completeness.sqlx"),
   "utf8"
 );
-const cookielessGrainAssertionSql = fs.readFileSync(
-  path.join(__dirname, "..", "definitions", "custom", "assertions", "assert_ga4_cookieless_performance_grain.sqlx"),
+const eventAttributionGrainAssertionSql = fs.readFileSync(
+  path.join(__dirname, "..", "definitions", "custom", "assertions", "assert_event_paid_attribution_grain.sqlx"),
   "utf8"
 );
-const cookielessMetricsAssertionSql = fs.readFileSync(
-  path.join(__dirname, "..", "definitions", "custom", "assertions", "assert_ga4_cookieless_metrics_contract.sqlx"),
+const eventMetricsAssertionSql = fs.readFileSync(
+  path.join(__dirname, "..", "definitions", "custom", "assertions", "assert_event_paid_attribution_metrics_contract.sqlx"),
   "utf8"
 );
-const cookielessEntityAssertionSql = fs.readFileSync(
-  path.join(__dirname, "..", "definitions", "custom", "assertions", "assert_ga4_cookieless_entity_completeness.sqlx"),
+const eventEntityAssertionSql = fs.readFileSync(
+  path.join(__dirname, "..", "definitions", "custom", "assertions", "assert_event_paid_attribution_entity_completeness.sqlx"),
   "utf8"
 );
-const cookielessCountryAssertionSql = fs.readFileSync(
-  path.join(__dirname, "..", "definitions", "custom", "assertions", "assert_ga4_cookieless_country_isolation.sqlx"),
+const eventCountryAssertionSql = fs.readFileSync(
+  path.join(__dirname, "..", "definitions", "custom", "assertions", "assert_event_paid_attribution_country_isolation.sqlx"),
   "utf8"
 );
-const cookielessCoverageAssertionSql = fs.readFileSync(
-  path.join(__dirname, "..", "definitions", "custom", "assertions", "assert_ga4_cookieless_paid_signal_coverage.sqlx"),
+const eventCoverageAssertionSql = fs.readFileSync(
+  path.join(__dirname, "..", "definitions", "custom", "assertions", "assert_event_paid_attribution_paid_signal_coverage.sqlx"),
   "utf8"
 );
 const googleAdsPerformanceSql = fs.readFileSync(
@@ -282,12 +286,10 @@ assert.ok(
     campaignPerformanceBaseSql.includes("DROP COLUMN link_clicks") &&
     campaignPerformanceBaseSql.includes("EXCEPTION WHEN ERROR THEN") &&
     campaignPerformanceBaseOutputSql.includes("\n  meta_link_clicks,") &&
-    cookielessPerformanceSql.includes("CAST(0 AS INT64) AS meta_link_clicks") &&
-    cookielessPerformanceSql.includes("ADD COLUMN IF NOT EXISTS meta_link_clicks INT64") &&
-    cookielessPerformanceSql.includes("DROP COLUMN link_clicks") &&
-    cookielessMetricsAssertionSql.includes("meta_link_clicks") &&
+    eventPerformanceMartSql.includes("COUNT(DISTINCT event_id) AS ga4_events") &&
+    !eventPerformanceMartSql.includes("meta_link_clicks") &&
     !campaignPerformanceBaseSql.includes("ALTER TABLE IF EXISTS") &&
-    !cookielessPerformanceSql.includes("ALTER TABLE IF EXISTS") &&
+    !eventPaidAttributionSql.includes("ALTER TABLE IF EXISTS") &&
     !campaignPerformanceMartSql.includes("ALTER TABLE IF EXISTS"),
   "Performance base should retain Meta link clicks only as the platform-specific internal meta_link_clicks field."
 );
@@ -332,36 +334,38 @@ assert.ok(
 );
 
 assert.ok(
-  cookielessPerformanceSql.includes("e.session_id IS NULL") &&
-    cookielessPerformanceSql.includes("'cookieless' AS ga4_event_identity_status") &&
-    cookielessPerformanceSql.includes("src_google_ads_click_mapping") &&
-    cookielessPerformanceSql.includes("src_meta_ads_ad_daily") &&
-    campaignPerformanceBaseSql.includes("unified_ga4_metrics") &&
-    campaignPerformanceBaseSql.includes("SELECT * FROM ${ref(\"int_ga4_cookieless_performance_daily\")}") &&
-    campaignPerformanceBaseSql.includes("AND ad.ga4_event_identity_status = ga4.ga4_event_identity_status") &&
+  eventPaidAttributionSql.includes("Event-grain GA4 paid-media attribution") &&
+    eventPaidAttributionSql.includes("event_identity_status") &&
+    eventPaidAttributionSql.includes("'cookieless'") &&
+    eventPaidAttributionSql.includes("'cookie_identified'") &&
+    eventPaidAttributionSql.includes("src_google_ads_click_mapping") &&
+    eventPaidAttributionSql.includes("src_meta_ads_ad_daily") &&
+    eventPerformanceMartSql.includes("${ref(\"int_event_paid_attribution\")}") &&
+    !campaignPerformanceBaseSql.includes("int_event_paid_attribution") &&
+    !campaignPerformanceBaseSql.includes("int_ga4_cookieless_performance_daily") &&
     campaignPerformanceBaseSql.includes("COUNT(DISTINCT e.event_id) AS ga4_events"),
-  "Performance mart should add a parallel cookieless GA4 event path and keep it separated from session-identified Ads rows."
+  "Event paid attribution should cover cookie-identified and cookieless events without mixing the event path into mart_performance_daily."
 );
 
 assert.ok(
-  cookielessPerformanceSql.includes("(SELECT country_code FROM release_country) AS country_code") &&
-    !cookielessPerformanceSql.includes('buildCountryCodeFromNameSql("e.geo.country")'),
-  "Cookieless GA4 events should inherit the release country like session-identified GA4 metrics instead of filtering by geo.country."
+  eventPaidAttributionSql.includes("(SELECT country_code FROM release_country) AS country_code") &&
+    !eventPaidAttributionSql.includes('buildCountryCodeFromNameSql("e.geo.country")'),
+  "GA4 event paid attribution should inherit the release country instead of filtering by geo.country."
 );
 
 assert.ok(
-  cookielessPerformanceSql.includes("landing_google_campaign_id") &&
-    cookielessPerformanceSql.includes("'google_paid'") &&
-    cookielessPerformanceSql.includes("demandgen") &&
-    cookielessPerformanceSql.includes("ELSE COALESCE(campaign_id, campaign_name)"),
-  "Cookieless Google Ads attribution should retain paid events from URL campaign params even when Ads click/campaign lookups do not match."
+  eventPaidAttributionSql.includes("landing_google_campaign_id") &&
+    eventPaidAttributionSql.includes("'google_paid'") &&
+    eventPaidAttributionSql.includes("demandgen") &&
+    eventPaidAttributionSql.includes("ELSE COALESCE(campaign_id, campaign_name)"),
+  "Event-scope Google Ads attribution should retain paid events from URL campaign params even when Ads click/campaign lookups do not match."
 );
 
 assert.ok(
-  cookielessPerformanceSql.includes("primaryMetaAccountNameSql") &&
-    cookielessPerformanceSql.includes("COALESCE(mc.account_id, ${primaryMetaAccountNameSql})") &&
-    cookielessPerformanceSql.includes("COALESCE(mc.campaign_id, e.landing_campaign_id, e.campaign)"),
-  "Cookieless Meta attribution should retain paid events from UTM campaign params even when the Meta Ads source has no matching campaign row."
+  eventPaidAttributionSql.includes("primaryMetaAccountNameSql") &&
+    eventPaidAttributionSql.includes("COALESCE(mc.account_id, ${primaryMetaAccountNameSql})") &&
+    eventPaidAttributionSql.includes("COALESCE(mc.campaign_id, e.landing_campaign_id, e.campaign)"),
+  "Event-scope Meta attribution should retain paid events from UTM campaign params even when the Meta Ads source has no matching campaign row."
 );
 
 assert.ok(
@@ -454,45 +458,44 @@ assert.ok(
 );
 
 assert.ok(
-  cookielessGrainAssertionSql.includes("description:") &&
-    cookielessGrainAssertionSql.includes("duplicate rows at the output grain") &&
-    cookielessGrainAssertionSql.includes("FROM ${ref(\"int_ga4_cookieless_performance_daily\")}") &&
-    cookielessGrainAssertionSql.includes("HAVING COUNT(*) > 1"),
-  "Cookieless grain assertion should document and enforce output-grain uniqueness."
+  eventAttributionGrainAssertionSql.includes("description:") &&
+    eventAttributionGrainAssertionSql.includes("duplicate rows for the same GA4 event") &&
+    eventAttributionGrainAssertionSql.includes("FROM ${ref(\"int_event_paid_attribution\")}") &&
+    eventAttributionGrainAssertionSql.includes("HAVING COUNT(*) > 1"),
+  "Event attribution grain assertion should document and enforce event-platform uniqueness."
 );
 
 assert.ok(
-  cookielessMetricsAssertionSql.includes("description:") &&
-    cookielessMetricsAssertionSql.includes("Cookieless rows can count GA4 events") &&
-    cookielessMetricsAssertionSql.includes("session_metrics_on_cookieless_row") &&
-    cookielessMetricsAssertionSql.includes("ads_delivery_metrics_on_cookieless_row") &&
-    cookielessMetricsAssertionSql.includes("platform_conversion_metrics_on_cookieless_row"),
-  "Cookieless metrics assertion should document and enforce the event-only metric contract."
+  eventMetricsAssertionSql.includes("description:") &&
+    eventMetricsAssertionSql.includes("event-only metric contract") &&
+    eventMetricsAssertionSql.includes("mart_event_performance_daily") &&
+    eventMetricsAssertionSql.includes("page_views_greater_than_events"),
+  "Event metrics assertion should document and enforce the event-only metric contract."
 );
 
 assert.ok(
-  cookielessEntityAssertionSql.includes("description:") &&
-    cookielessEntityAssertionSql.includes("missing entity_id or entity_name") &&
-    cookielessEntityAssertionSql.includes("failure_reason") &&
-    cookielessEntityAssertionSql.includes("platform IN ('google_ads', 'meta_ads')"),
-  "Cookieless entity assertion should document and expose missing entity identifiers."
+  eventEntityAssertionSql.includes("description:") &&
+    eventEntityAssertionSql.includes("missing entity_id or entity_name") &&
+    eventEntityAssertionSql.includes("failure_reason") &&
+    eventEntityAssertionSql.includes("platform IN ('google_ads', 'meta_ads')"),
+  "Event entity assertion should document and expose missing entity identifiers."
 );
 
 assert.ok(
-  cookielessCountryAssertionSql.includes("description:") &&
-    cookielessCountryAssertionSql.includes("visitor geo country") &&
-    cookielessCountryAssertionSql.includes("dim_seo_insights_source_mapping") &&
-    cookielessCountryAssertionSql.includes("ga4_output_dataset"),
-  "Cookieless country assertion should document and enforce release-country isolation."
+  eventCountryAssertionSql.includes("description:") &&
+    eventCountryAssertionSql.includes("current release config output dataset") &&
+    eventCountryAssertionSql.includes("dim_seo_insights_source_mapping") &&
+    eventCountryAssertionSql.includes("ga4_output_dataset"),
+  "Event country assertion should document and enforce release-country isolation."
 );
 
 assert.ok(
-  cookielessCoverageAssertionSql.includes("description:") &&
-    cookielessCoverageAssertionSql.includes("cookieless paid-media signals") &&
-    cookielessCoverageAssertionSql.includes("DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)") &&
-    cookielessCoverageAssertionSql.includes("ga4_events") &&
-    cookielessCoverageAssertionSql.includes("int_ga4_cookieless_performance_daily"),
-  "Cookieless coverage assertion should document and detect paid-signal days with no cookieless output."
+  eventCoverageAssertionSql.includes("description:") &&
+    eventCoverageAssertionSql.includes("paid-media signals") &&
+    eventCoverageAssertionSql.includes("DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)") &&
+    eventCoverageAssertionSql.includes("ga4_events") &&
+    eventCoverageAssertionSql.includes("int_event_paid_attribution"),
+  "Event coverage assertion should document and detect paid-signal days with no event attribution output."
 );
 
 assert.ok(
@@ -647,7 +650,7 @@ assert.ok(
 
 assert.ok(
   campaignPerformanceBaseSql.includes("GROUP BY 1, 2, 3, 4, 6, 8, 10, 13, 14, 16, 17"),
-  "GA4 entity aggregation should group by real keys only, including ga4_attribution_grain and ga4_event_identity_status."
+  "GA4 session entity aggregation should group by real keys only, including ga4_attribution_grain and ga4_event_identity_status."
 );
 
 console.log("marketing helpers google ads regression tests passed");

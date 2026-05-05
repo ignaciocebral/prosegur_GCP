@@ -1,13 +1,12 @@
 config {
   type: "assertion",
   schema: dataform.projectConfig.vars.QUALITY_DATASET,
-  tags: [dataform.projectConfig.vars.LABEL_EXECUTION_OPERATION, "quality", "performance", "cookieless", "coverage"],
-  description: "Fails when recent GA4 events have cookieless paid-media signals but int_ga4_cookieless_performance_daily has no output for the same date and platform. This catches broken platform detection, country filtering, or UTM/click-id fallback logic."
+  tags: [dataform.projectConfig.vars.LABEL_EXECUTION_OPERATION, "quality", "attribution", "events", "coverage"],
+  description: "Fails when recent GA4 events have paid-media signals but int_event_paid_attribution has no output for the same date and platform."
 }
 
 -- This is intentionally a recent-window coverage assertion, not a full historical
--- reconciliation. It detects the class of bug where cookieless paid events exist
--- in ga4_events but the parallel cookieless performance path produces no rows.
+-- reconciliation. It detects broken platform detection or UTM/click-id fallback logic.
 WITH event_scope AS (
   SELECT
     e.event_id,
@@ -36,12 +35,14 @@ WITH event_scope AS (
     ) AS traffic_campaign_id,
     NULLIF(LOWER(REGEXP_EXTRACT(e.page.location, r"[?&](?:campaign|gad_campaignid)=([0-9]+)")), '') AS landing_google_campaign_id,
     NULLIF(LOWER(REGEXP_EXTRACT(e.page.location, r"[?&]utm_id=([0-9]+)")), '') AS landing_meta_campaign_id,
-    COALESCE(e.click_ids.gclid, e.collected_traffic_source.gclid) AS event_gclid,
-    NULLIF(CAST(e.session_traffic_source_last_click.google_ads_campaign.campaign_id AS STRING), '0') AS event_google_campaign_id,
+    COALESCE(
+      e.click_ids.gclid,
+      e.collected_traffic_source.gclid,
+      NULLIF(LOWER(REGEXP_EXTRACT(e.page.location, r"[?&]gclid=([^&#]+)")), '')
+    ) AS event_gclid,
     REGEXP_CONTAINS(LOWER(COALESCE(e.page.location, e.page.path, '')), r'alarm') AS is_meta_matching_excluded_url
   FROM ${ref("ga4_events")} e
   WHERE e.event_date >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)
-    AND e.session_id IS NULL
 ),
 
 paid_signal_events AS (
@@ -51,7 +52,6 @@ paid_signal_events AS (
     COUNT(DISTINCT event_id) AS paid_signal_events
   FROM event_scope
   WHERE event_gclid IS NOT NULL
-    OR event_google_campaign_id IS NOT NULL
     OR (
       LOWER(COALESCE(source, '')) IN ('google', 'google_ads', 'google_paid', 'adwords', 'google.com')
       AND REGEXP_CONTAINS(LOWER(COALESCE(medium, '')), r'(cpc|ppc|paid|sem|demandgen|display|pmax)')
@@ -72,13 +72,13 @@ paid_signal_events AS (
   GROUP BY 1, 2
 ),
 
-cookieless_output AS (
+event_output AS (
   SELECT
     date,
     platform,
-    SUM(ga4_events) AS cookieless_ga4_events,
-    COUNT(*) AS cookieless_rows
-  FROM ${ref("int_ga4_cookieless_performance_daily")}
+    COUNT(DISTINCT event_id) AS attributed_events,
+    COUNT(*) AS attributed_rows
+  FROM ${ref("int_event_paid_attribution")}
   WHERE date >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)
   GROUP BY 1, 2
 )
@@ -87,11 +87,11 @@ SELECT
   p.date,
   p.platform,
   p.paid_signal_events,
-  COALESCE(c.cookieless_ga4_events, 0) AS cookieless_ga4_events,
-  COALESCE(c.cookieless_rows, 0) AS cookieless_rows
+  COALESCE(c.attributed_events, 0) AS attributed_events,
+  COALESCE(c.attributed_rows, 0) AS attributed_rows
 FROM paid_signal_events p
-LEFT JOIN cookieless_output c
+LEFT JOIN event_output c
   ON p.date = c.date
   AND p.platform = c.platform
 WHERE p.paid_signal_events > 0
-  AND COALESCE(c.cookieless_ga4_events, 0) = 0
+  AND COALESCE(c.attributed_events, 0) = 0
