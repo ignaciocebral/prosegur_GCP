@@ -184,6 +184,24 @@ ad_info AS (
     customer_id,
     ad_group_id,
     ad_group_ad_ad_id AS ad_id,
+    CASE
+      WHEN ad_group_ad_ad_type = 'EXPANDED_TEXT_AD' THEN
+        CONCAT(
+          COALESCE(ad_group_ad_ad_expanded_text_ad_headline_part1, ''),
+          ' - ',
+          COALESCE(ad_group_ad_ad_expanded_text_ad_headline_part2, '')
+        )
+      WHEN ad_group_ad_ad_type = 'RESPONSIVE_SEARCH_AD' THEN
+        REGEXP_EXTRACT(ad_group_ad_ad_responsive_search_ad_headlines, r'"(.*?)"')
+      WHEN ad_group_ad_ad_type = 'IMAGE_AD' THEN
+        ad_group_ad_ad_image_ad_name
+      WHEN ad_group_ad_ad_type = 'CALL_AD' THEN
+        ad_group_ad_ad_call_ad_phone_number
+      WHEN ad_group_ad_ad_type = 'RESPONSIVE_DISPLAY_AD' THEN
+        ad_group_ad_ad_responsive_display_ad_long_headline
+      ELSE
+        'Unknown'
+    END AS ad_name,
     ad_group_ad_ad_type AS ad_type,
     ad_group_ad_ad_strength AS ad_strength,
     ad_group_ad_ad_final_urls AS ad_final_urls,
@@ -193,6 +211,12 @@ ad_info AS (
       customer_id,
       ad_group_id,
       ad_group_ad_ad_id,
+      ad_group_ad_ad_expanded_text_ad_headline_part1,
+      ad_group_ad_ad_expanded_text_ad_headline_part2,
+      ad_group_ad_ad_responsive_search_ad_headlines,
+      ad_group_ad_ad_image_ad_name,
+      ad_group_ad_ad_call_ad_phone_number,
+      ad_group_ad_ad_responsive_display_ad_long_headline,
       ad_group_ad_ad_type,
       ad_group_ad_ad_strength,
       ad_group_ad_ad_final_urls,
@@ -250,6 +274,7 @@ SELECT
   s.ad_group_id,
   ag.ad_group_name,
   s.ad_id,
+  ai.ad_name,
   ai.ad_type,
   ai.ad_strength,
   ai.ad_final_urls,

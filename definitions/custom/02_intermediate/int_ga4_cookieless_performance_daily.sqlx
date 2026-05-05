@@ -1,0 +1,497 @@
+/*
+"""
+Description: Cookieless GA4 event-level performance aggregation for paid-media reporting.
+Author: Codex
+Date: 2026-05-04
+Purpose: Production
+Retention: Permanent - Parallel GA4 event path for consent-limited hits that cannot become GA4 sessions.
+"""
+*/
+
+config {
+  type: "incremental",
+  schema: dataform.projectConfig.vars.TRANSFORMATIONS_DATASET,
+  tags: [dataform.projectConfig.vars.LABEL_EXECUTION_OPERATION, "performance", "ga4", "cookieless", "staging"],
+  description: "Aggregates cookieless GA4 events to paid-media performance grain using event-level traffic parameters when campaign/ad identifiers are still available.",
+  bigquery: {
+    partitionBy: "date",
+    clusterBy: ["platform", "country_code", "campaign_id"]
+  }
+}
+
+js {
+  const { parseMetaAccountNames } = require("includes/custom/marketing_helpers.js");
+  const configuredMetaAccountNames = parseMetaAccountNames(dataform.projectConfig.vars.META_ADS_ACCOUNT_NAMES || "");
+  const primaryMetaAccountName = configuredMetaAccountNames[0] || "meta_ads";
+  const primaryMetaAccountNameSql = "'" + primaryMetaAccountName.replace(/'/g, "''") + "'";
+}
+
+pre_operations {
+  declare date_checkpoint DATE;
+  set date_checkpoint = (
+    ${when(incremental(),
+      `SELECT COALESCE(DATE_SUB(MAX(date), INTERVAL 3 DAY), DATE('2020-01-01')) FROM ${self()}`,
+      `SELECT DATE('2020-01-01')`
+    )}
+  );
+  ${when(incremental(),
+    `ALTER TABLE ${self()} ADD COLUMN IF NOT EXISTS meta_link_clicks INT64;
+     BEGIN
+       ALTER TABLE ${self()} DROP COLUMN link_clicks;
+     EXCEPTION WHEN ERROR THEN
+       SET date_checkpoint = date_checkpoint;
+     END;
+     DELETE FROM ${self()} WHERE date >= date_checkpoint`
+  )}
+}
+
+WITH release_country AS (
+  SELECT ANY_VALUE(country_code) AS country_code
+  FROM ${ref("dim_seo_insights_source_mapping")}
+  WHERE ga4_output_dataset = '${dataform.projectConfig.vars.OUTPUTS_DATASET}'
+),
+
+event_scope AS (
+  SELECT
+    e.event_id,
+    e.event_date AS date,
+    (SELECT country_code FROM release_country) AS country_code,
+    e.event_name,
+    e.time.event_timestamp_utc AS event_timestamp_utc,
+    e.page.location AS page_location,
+    e.page.path AS page_path,
+    COALESCE(
+      NULLIF(e.fixed_traffic_source.source, ''),
+      NULLIF(LOWER(e.collected_traffic_source.manual_source), ''),
+      NULLIF(LOWER(REGEXP_EXTRACT(e.page.location, r"[?&]utm_source=([^&#]+)")), ''),
+      NULLIF(LOWER(REGEXP_EXTRACT(e.page.location, r"[?&]source=([^&#]+)")), '')
+    ) AS source,
+    COALESCE(
+      NULLIF(e.fixed_traffic_source.medium, ''),
+      NULLIF(LOWER(e.collected_traffic_source.manual_medium), ''),
+      NULLIF(LOWER(REGEXP_EXTRACT(e.page.location, r"[?&]utm_medium=([^&#]+)")), ''),
+      NULLIF(LOWER(REGEXP_EXTRACT(e.page.location, r"[?&]medium=([^&#]+)")), '')
+    ) AS medium,
+    COALESCE(
+      NULLIF(e.fixed_traffic_source.campaign, ''),
+      NULLIF(LOWER(e.collected_traffic_source.manual_campaign_name), ''),
+      NULLIF(LOWER(REGEXP_EXTRACT(e.page.location, r"[?&]utm_campaign=([^&#]+)")), '')
+    ) AS campaign,
+    COALESCE(
+      NULLIF(e.fixed_traffic_source.campaign_id, ''),
+      NULLIF(LOWER(e.collected_traffic_source.manual_campaign_id), ''),
+      NULLIF(LOWER(REGEXP_EXTRACT(e.page.location, r"[?&]utm_id=([0-9]+)")), '')
+    ) AS traffic_campaign_id,
+    NULLIF(LOWER(REGEXP_EXTRACT(e.page.location, r"[?&](?:campaign|gad_campaignid)=([0-9]+)")), '') AS landing_google_campaign_id,
+    COALESCE(
+      NULLIF(e.fixed_traffic_source.term, ''),
+      NULLIF(LOWER(e.collected_traffic_source.manual_term), ''),
+      NULLIF(LOWER(REGEXP_EXTRACT(e.page.location, r"[?&]utm_term=([^&#]+)")), ''),
+      NULLIF(LOWER(REGEXP_EXTRACT(e.page.location, r"[?&]term=([^&#]+)")), '')
+    ) AS term,
+    COALESCE(
+      NULLIF(e.fixed_traffic_source.content, ''),
+      NULLIF(LOWER(e.collected_traffic_source.manual_content), ''),
+      NULLIF(LOWER(REGEXP_EXTRACT(e.page.location, r"[?&]utm_content=([^&#]+)")), ''),
+      NULLIF(LOWER(REGEXP_EXTRACT(e.page.location, r"[?&]content=([^&#]+)")), '')
+    ) AS content,
+    NULLIF(LOWER(REGEXP_EXTRACT(e.page.location, r"[?&]utm_id=([0-9]+)")), '') AS landing_campaign_id,
+    NULLIF(LOWER(REGEXP_EXTRACT(e.page.location, r"[?&]adset_id=([^&#]+)")), '') AS landing_adset_id,
+    NULLIF(LOWER(REGEXP_EXTRACT(e.page.location, r"[?&]ad_id=([^&#]+)")), '') AS landing_ad_id,
+    REGEXP_CONTAINS(
+      LOWER(COALESCE(e.page.location, e.page.path, '')),
+      r'alarm'
+    ) AS is_meta_matching_excluded_url,
+    COALESCE(e.click_ids.gclid, e.collected_traffic_source.gclid) AS event_gclid,
+    NULLIF(CAST(e.session_traffic_source_last_click.google_ads_campaign.customer_id AS STRING), '0') AS event_google_customer_id,
+    e.session_traffic_source_last_click.google_ads_campaign.account_name AS event_google_account_name,
+    NULLIF(CAST(e.session_traffic_source_last_click.google_ads_campaign.campaign_id AS STRING), '0') AS event_google_campaign_id,
+    e.session_traffic_source_last_click.google_ads_campaign.campaign_name AS event_google_campaign_name,
+    NULLIF(CAST(e.session_traffic_source_last_click.google_ads_campaign.ad_group_id AS STRING), '0') AS event_google_ad_group_id,
+    e.session_traffic_source_last_click.google_ads_campaign.ad_group_name AS event_google_ad_group_name
+  FROM ${ref("ga4_events")} e
+  WHERE e.event_date >= date_checkpoint
+    AND e.session_id IS NULL
+),
+
+google_perf AS (
+  SELECT
+    segments_date AS date,
+    customer_id,
+    campaign_id,
+    ad_group_id,
+    SUM(metrics_impressions) AS impressions,
+    SUM(metrics_clicks) AS clicks,
+    SUM(metrics_cost_micros) / 1000000 AS spend
+  FROM ${ref("ads_AdGroupStats_1534842056")}
+  WHERE customer_id = CAST(${dataform.projectConfig.vars.GOOGLE_ADS_CUSTOMER_ID} AS INT64)
+    AND segments_date >= date_checkpoint
+  GROUP BY 1, 2, 3, 4
+),
+
+google_bridge_candidates AS (
+  SELECT
+    c.gclid,
+    c.date,
+    c.customer_id,
+    c.account_name,
+    c.campaign_id,
+    c.campaign_name,
+    c.ad_group_id,
+    c.ad_group_name,
+    c.ad_id,
+    c.keyword_text,
+    c.keyword_match_text,
+    c.keyword_match_type,
+    COALESCE(p.impressions, 0) AS impressions,
+    COALESCE(p.clicks, 0) AS clicks,
+    COALESCE(p.spend, 0) AS spend
+  FROM ${ref("src_google_ads_click_mapping")} c
+  LEFT JOIN google_perf p
+    ON c.date = p.date
+    AND c.customer_id = p.customer_id
+    AND c.campaign_id = p.campaign_id
+    AND c.ad_group_id = p.ad_group_id
+  WHERE c.gclid IS NOT NULL
+    AND c.date >= date_checkpoint
+),
+
+google_joined AS (
+  SELECT
+    gclid,
+    date,
+    CAST(customer_id AS STRING) AS customer_id,
+    account_name,
+    CAST(campaign_id AS STRING) AS campaign_id,
+    campaign_name,
+    CAST(ad_group_id AS STRING) AS ad_group_id,
+    ad_group_name,
+    CAST(ad_id AS STRING) AS ad_id,
+    keyword_text,
+    keyword_match_text,
+    keyword_match_type,
+    impressions,
+    clicks,
+    spend
+  FROM (
+    SELECT
+      *,
+      ROW_NUMBER() OVER (
+        PARTITION BY gclid, date
+        ORDER BY clicks DESC, spend DESC, campaign_id DESC, ad_group_id DESC
+      ) AS rn
+    FROM google_bridge_candidates
+  )
+  WHERE rn = 1
+),
+
+google_campaign_lookup AS (
+  SELECT
+    CAST(c.customer_id AS STRING) AS customer_id,
+    acc.account_name,
+    CAST(c.campaign_id AS STRING) AS campaign_id,
+    c.campaign_name
+  FROM ${ref("src_google_ads_campaign_lookup")} c
+  LEFT JOIN ${ref("src_google_ads_customer_lookup")} acc
+    ON c.customer_id = acc.customer_id
+  WHERE acc.country_code IN (SELECT country_code FROM release_country)
+),
+
+google_context AS (
+  SELECT
+    e.event_id,
+    e.date,
+    e.country_code,
+    e.event_name,
+    'google_ads' AS platform,
+    COALESCE(
+      g.customer_id,
+      e.event_google_customer_id,
+      gc.customer_id,
+      CAST(${dataform.projectConfig.vars.GOOGLE_ADS_CUSTOMER_ID} AS STRING)
+    ) AS account_id,
+    COALESCE(
+      g.account_name,
+      e.event_google_account_name,
+      gc.account_name,
+      CAST(${dataform.projectConfig.vars.GOOGLE_ADS_CUSTOMER_ID} AS STRING)
+    ) AS account_name,
+    COALESCE(
+      g.campaign_id,
+      e.event_google_campaign_id,
+      gc.campaign_id,
+      e.landing_google_campaign_id,
+      e.traffic_campaign_id
+    ) AS campaign_id,
+    COALESCE(
+      g.campaign_name,
+      e.event_google_campaign_name,
+      gc.campaign_name,
+      e.campaign,
+      e.landing_google_campaign_id,
+      e.traffic_campaign_id
+    ) AS campaign_name,
+    NULLIF(COALESCE(g.ad_group_id, e.event_google_ad_group_id), '0') AS normalized_google_ad_group_id,
+    COALESCE(g.ad_group_name, e.event_google_ad_group_name) AS normalized_google_ad_group_name,
+    NULLIF(g.ad_id, '0') AS normalized_google_ad_id,
+    CAST(NULL AS STRING) AS normalized_meta_adset_id,
+    CAST(NULL AS STRING) AS normalized_meta_adset_name,
+    CAST(NULL AS STRING) AS normalized_meta_ad_id,
+    CAST(NULL AS STRING) AS ad_name
+  FROM event_scope e
+  LEFT JOIN google_joined g
+    ON e.event_gclid = g.gclid
+    AND e.date = g.date
+  LEFT JOIN google_campaign_lookup gc
+    ON COALESCE(
+      e.event_google_campaign_id,
+      e.landing_google_campaign_id,
+      CASE
+        WHEN REGEXP_CONTAINS(COALESCE(e.traffic_campaign_id, ''), r'^[0-9]+$') THEN e.traffic_campaign_id
+        ELSE NULL
+      END
+    ) = gc.campaign_id
+  WHERE g.gclid IS NOT NULL
+    OR e.event_google_campaign_id IS NOT NULL
+    OR (
+      LOWER(COALESCE(e.source, '')) IN ('google', 'google_ads', 'google_paid', 'adwords', 'google.com')
+      AND REGEXP_CONTAINS(LOWER(COALESCE(e.medium, '')), r'(cpc|ppc|paid|sem|demandgen|display|pmax)')
+      AND COALESCE(
+        gc.campaign_id,
+        e.landing_google_campaign_id,
+        e.traffic_campaign_id,
+        e.campaign
+      ) IS NOT NULL
+    )
+  QUALIFY ROW_NUMBER() OVER (
+    PARTITION BY e.event_id
+    ORDER BY
+      IF(g.gclid IS NOT NULL, 1, 0) DESC,
+      IF(e.event_google_campaign_id IS NOT NULL, 1, 0) DESC,
+      IF(gc.campaign_id IS NOT NULL, 1, 0) DESC,
+      IF(e.landing_google_campaign_id IS NOT NULL, 1, 0) DESC,
+      gc.campaign_id DESC
+  ) = 1
+),
+
+meta_campaign_agg AS (
+  SELECT
+    date,
+    campaign_id,
+    campaign_name,
+    account_id,
+    account_name,
+    ad_account_name
+  FROM ${ref("src_meta_ads_ad_daily")}
+  GROUP BY 1, 2, 3, 4, 5, 6
+),
+
+meta_ad_lookup AS (
+  SELECT
+    date,
+    campaign_id,
+    campaign_name,
+    adset_id,
+    adset_name,
+    ad_id,
+    ad_name
+  FROM ${ref("src_meta_ads_ad_daily")}
+),
+
+meta_context AS (
+  SELECT
+    e.event_id,
+    e.date,
+    e.country_code,
+    e.event_name,
+    'meta_ads' AS platform,
+    COALESCE(mc.account_id, ${primaryMetaAccountNameSql}) AS account_id,
+    COALESCE(mc.account_name, ${primaryMetaAccountNameSql}) AS account_name,
+    COALESCE(mc.campaign_id, e.landing_campaign_id, e.campaign) AS campaign_id,
+    COALESCE(mc.campaign_name, e.campaign, e.landing_campaign_id) AS campaign_name,
+    CAST(NULL AS STRING) AS normalized_google_ad_group_id,
+    CAST(NULL AS STRING) AS normalized_google_ad_group_name,
+    CAST(NULL AS STRING) AS normalized_google_ad_id,
+    COALESCE(mad.adset_id, e.landing_adset_id) AS normalized_meta_adset_id,
+    COALESCE(mad.adset_name, e.term, e.landing_adset_id) AS normalized_meta_adset_name,
+    COALESCE(mad.ad_id, e.landing_ad_id) AS normalized_meta_ad_id,
+    COALESCE(mad.ad_name, e.content, e.landing_ad_id) AS ad_name
+  FROM event_scope e
+  LEFT JOIN meta_campaign_agg mc
+    ON e.date = mc.date
+    AND NOT e.is_meta_matching_excluded_url
+    AND LOWER(COALESCE(e.source, '')) IN ('meta', 'facebook', 'fb', 'ig', 'instagram', 'facebook.com', 'l.facebook.com', 'lm.facebook.com')
+    AND (
+      (e.landing_campaign_id IS NOT NULL AND e.landing_campaign_id = mc.campaign_id)
+      OR
+      (e.landing_campaign_id IS NULL AND LOWER(TRIM(e.campaign)) = LOWER(TRIM(mc.campaign_name)))
+    )
+  LEFT JOIN meta_ad_lookup mad
+    ON mc.campaign_id IS NOT NULL
+    AND mc.date = mad.date
+    AND mc.campaign_id = mad.campaign_id
+    AND (
+      (
+        e.landing_adset_id IS NOT NULL
+        AND e.landing_ad_id IS NOT NULL
+        AND e.landing_adset_id = mad.adset_id
+        AND e.landing_ad_id = mad.ad_id
+      )
+      OR
+      (
+        (e.landing_adset_id IS NULL OR e.landing_ad_id IS NULL)
+        AND LOWER(TRIM(e.term)) = LOWER(TRIM(mad.adset_name))
+        AND LOWER(TRIM(e.content)) = LOWER(TRIM(mad.ad_name))
+      )
+    )
+  WHERE NOT e.is_meta_matching_excluded_url
+    AND LOWER(COALESCE(e.source, '')) IN ('meta', 'facebook', 'fb', 'ig', 'instagram', 'facebook.com', 'l.facebook.com', 'lm.facebook.com')
+    AND COALESCE(mc.campaign_id, e.landing_campaign_id, e.campaign) IS NOT NULL
+  QUALIFY ROW_NUMBER() OVER (
+    PARTITION BY e.event_id
+    ORDER BY
+      IF(mad.ad_id IS NOT NULL, 1, 0) DESC,
+      IF(mc.campaign_id IS NOT NULL, 1, 0) DESC,
+      IF(e.landing_campaign_id IS NOT NULL, 1, 0) DESC,
+      mc.campaign_id DESC,
+      mad.adset_id DESC,
+      mad.ad_id DESC
+  ) = 1
+),
+
+cookieless_base_context AS (
+  SELECT * FROM google_context
+  UNION ALL
+  SELECT * FROM meta_context
+),
+
+cookieless_entity_context AS (
+  SELECT
+    event_id,
+    date,
+    country_code,
+    event_name,
+    platform,
+    account_id,
+    account_name,
+    campaign_id,
+    campaign_name,
+    CASE
+      WHEN platform = 'google_ads' THEN normalized_google_ad_group_id
+      WHEN platform = 'meta_ads' THEN normalized_meta_adset_id
+      ELSE CAST(NULL AS STRING)
+    END AS ad_group_or_adset_id,
+    CASE
+      WHEN platform = 'google_ads' THEN normalized_google_ad_group_name
+      WHEN platform = 'meta_ads' THEN normalized_meta_adset_name
+      ELSE CAST(NULL AS STRING)
+    END AS ad_group_or_adset_name,
+    CASE
+      WHEN platform = 'google_ads' THEN normalized_google_ad_id
+      WHEN platform = 'meta_ads' THEN normalized_meta_ad_id
+      ELSE CAST(NULL AS STRING)
+    END AS ad_id,
+    CASE
+      WHEN platform = 'meta_ads' AND normalized_meta_ad_id IS NOT NULL THEN ad_name
+      WHEN platform = 'google_ads' AND normalized_google_ad_id IS NOT NULL THEN normalized_google_ad_id
+      ELSE CAST(NULL AS STRING)
+    END AS ad_name,
+    CASE
+      WHEN platform = 'google_ads' AND normalized_google_ad_id IS NOT NULL THEN 'ad'
+      WHEN platform = 'meta_ads' AND normalized_meta_ad_id IS NOT NULL THEN 'ad'
+      WHEN platform = 'google_ads' AND normalized_google_ad_group_id IS NOT NULL THEN 'ad_group_or_adset'
+      WHEN platform = 'meta_ads' AND normalized_meta_adset_id IS NOT NULL THEN 'ad_group_or_adset'
+      ELSE 'campaign'
+    END AS entity_grain,
+    CASE
+      WHEN platform = 'google_ads' AND normalized_google_ad_id IS NOT NULL THEN normalized_google_ad_id
+      WHEN platform = 'meta_ads' AND normalized_meta_ad_id IS NOT NULL THEN normalized_meta_ad_id
+      WHEN platform = 'google_ads' AND normalized_google_ad_group_id IS NOT NULL THEN normalized_google_ad_group_id
+      WHEN platform = 'meta_ads' AND normalized_meta_adset_id IS NOT NULL THEN normalized_meta_adset_id
+      ELSE COALESCE(campaign_id, campaign_name)
+    END AS entity_id,
+    CASE
+      WHEN platform = 'google_ads' AND normalized_google_ad_id IS NOT NULL THEN normalized_google_ad_id
+      WHEN platform = 'meta_ads' AND normalized_meta_ad_id IS NOT NULL THEN COALESCE(ad_name, normalized_meta_ad_id)
+      WHEN platform = 'google_ads' AND normalized_google_ad_group_id IS NOT NULL
+        THEN COALESCE(normalized_google_ad_group_name, normalized_google_ad_group_id)
+      WHEN platform = 'meta_ads' AND normalized_meta_adset_id IS NOT NULL
+        THEN COALESCE(normalized_meta_adset_name, normalized_meta_adset_id)
+      ELSE COALESCE(campaign_name, campaign_id)
+    END AS entity_name,
+    CASE
+      WHEN platform = 'google_ads' AND normalized_google_ad_id IS NOT NULL THEN 'ad'
+      WHEN platform = 'meta_ads' AND normalized_meta_ad_id IS NOT NULL THEN 'ad'
+      WHEN platform = 'google_ads' AND normalized_google_ad_group_id IS NOT NULL THEN 'ad_group_or_adset'
+      WHEN platform = 'meta_ads' AND normalized_meta_adset_id IS NOT NULL THEN 'ad_group_or_adset'
+      ELSE 'campaign'
+    END AS ga4_attribution_grain
+  FROM cookieless_base_context
+)
+
+SELECT
+  date,
+  platform,
+  country_code,
+  account_id,
+  COALESCE(
+    ARRAY_AGG(account_name IGNORE NULLS LIMIT 1)[SAFE_OFFSET(0)],
+    account_id
+  ) AS account_name,
+  campaign_id,
+  COALESCE(
+    ARRAY_AGG(campaign_name IGNORE NULLS LIMIT 1)[SAFE_OFFSET(0)],
+    campaign_id
+  ) AS campaign_name,
+  ad_group_or_adset_id,
+  COALESCE(
+    ARRAY_AGG(ad_group_or_adset_name IGNORE NULLS LIMIT 1)[SAFE_OFFSET(0)],
+    ad_group_or_adset_id
+  ) AS ad_group_or_adset_name,
+  CASE
+    WHEN ga4_attribution_grain = 'ad' THEN ad_id
+    ELSE CAST(NULL AS STRING)
+  END AS ad_id,
+  CASE
+    WHEN ga4_attribution_grain = 'ad' THEN COALESCE(
+      ARRAY_AGG(ad_name IGNORE NULLS LIMIT 1)[SAFE_OFFSET(0)],
+      ARRAY_AGG(ad_id IGNORE NULLS LIMIT 1)[SAFE_OFFSET(0)]
+    )
+    ELSE CAST(NULL AS STRING)
+  END AS ad_name,
+  CAST(NULL AS BOOL) AS is_pmax,
+  entity_grain,
+  entity_id,
+  COALESCE(
+    ARRAY_AGG(entity_name IGNORE NULLS LIMIT 1)[SAFE_OFFSET(0)],
+    entity_id
+  ) AS entity_name,
+  ga4_attribution_grain,
+  'cookieless' AS ga4_event_identity_status,
+  CAST(0 AS INT64) AS impressions,
+  CAST(0 AS INT64) AS clicks,
+  CAST(0 AS INT64) AS meta_link_clicks,
+  CAST(0 AS FLOAT64) AS spend,
+  CAST(0 AS FLOAT64) AS platform_conversions_form,
+  CAST(0 AS FLOAT64) AS platform_conversions_call,
+  CAST(0 AS FLOAT64) AS platform_conversions_crm,
+  CAST(0 AS FLOAT64) AS platform_conversions_visita,
+  CAST(0 AS FLOAT64) AS platform_conversions_no_gestionado,
+  CAST(0 AS FLOAT64) AS platform_conversions_no_cualificado,
+  CAST(0 AS FLOAT64) AS platform_conversions_cualificado_negativo,
+  CAST(0 AS FLOAT64) AS platform_conversions_total,
+  CAST(0 AS FLOAT64) AS platform_conversions_value,
+  CAST(0 AS INT64) AS ga4_sessions,
+  CAST(0 AS INT64) AS ga4_users,
+  CAST(0 AS INT64) AS ga4_engaged_sessions,
+  COUNT(DISTINCT event_id) AS ga4_events,
+  COUNTIF(REGEXP_CONTAINS(LOWER(event_name), r'cmb')) AS ga4_conversions_cmb,
+  COUNTIF(
+    REGEXP_CONTAINS(LOWER(event_name), r'form')
+    AND NOT REGEXP_CONTAINS(LOWER(event_name), r'formulario')
+  ) AS ga4_conversions_form,
+  COUNTIF(REGEXP_CONTAINS(LOWER(event_name), r'c2c')) AS ga4_conversions_c2c,
+  COUNTIF(event_name = 'generate_lead' OR LOWER(event_name) = 'generate_lead_crm') AS ga4_conversions_generate_lead,
+  COUNTIF(event_name = 'page_view') AS ga4_page_views
+FROM cookieless_entity_context
+GROUP BY 1, 2, 3, 4, 6, 8, 10, 12, 13, 14, 16, 17

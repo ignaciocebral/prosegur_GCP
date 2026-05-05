@@ -1,0 +1,32 @@
+config {
+  type: "assertion",
+  schema: dataform.projectConfig.vars.QUALITY_DATASET,
+  tags: [dataform.projectConfig.vars.LABEL_EXECUTION_OPERATION, "quality", "performance", "paid_media"],
+  description: "Fails when paid-media performance mart rows are missing entity_name, which indicates broken paid attribution labels or UTM/click-id mapping."
+}
+
+SELECT
+  date,
+  country_code,
+  platform,
+  account_id,
+  account_name,
+  campaign_id,
+  campaign_name,
+  ad_group_or_adset_id,
+  ad_group_or_adset_name,
+  ad_id,
+  ad_name,
+  entity_id,
+  entity_name,
+  ga4_attribution_grain,
+  ga4_event_identity_status,
+  impressions,
+  clicks,
+  spend,
+  ga4_sessions,
+  ga4_events,
+  ga4_total_leads
+FROM ${ref("mart_performance_daily")}
+WHERE platform IN ('google_ads', 'meta_ads')
+  AND entity_name IS NULL

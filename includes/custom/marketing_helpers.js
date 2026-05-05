@@ -297,10 +297,12 @@ const META_ADS_CUALIFICADO_NEGATIVO_CONVERSION_NAMES = [
   "offsite_conversion.fb_pixel_custom.Baja Recaudacion"
 ];
 
-const META_ADS_REVIEW_CONVERSION_NAMES = [
+const META_ADS_IGNORED_CONVERSION_NAMES = [
   "offsite_conversion.fb_pixel_custom.Lead_60s/50%",
   "CompleteRegistration"
 ];
+
+const META_ADS_REVIEW_CONVERSION_NAMES = META_ADS_IGNORED_CONVERSION_NAMES;
 
 const META_ADS_CONVERSION_AUDIT = [
   {
@@ -353,22 +355,26 @@ const META_ADS_CONVERSION_AUDIT = [
   },
   {
     conversion_name: "offsite_conversion.fb_pixel_custom.Lead_60s/50%",
-    recommended_bucket: "review",
+    recommended_bucket: "ignored",
     scope: "DE",
-    reason: "Appears in Meta live event breakdown but was not present in the BigQuery raw conversions during this audit."
+    reason: "Excluded from lead conversion totals and coverage checks until it is validated as a business lead outcome."
   },
   {
     conversion_name: "CompleteRegistration",
-    recommended_bucket: "review",
+    recommended_bucket: "ignored",
     scope: "CO, PE live Meta events",
-    reason: "Visible in live Meta API but not in the BigQuery raw conversion export used by this ETL."
+    reason: "Excluded from lead conversion totals and coverage checks until it is validated as a business lead outcome."
   }
 ];
 
-function buildMetaAdsExcludedFromCoverageSql(columnName) {
-  return META_ADS_REVIEW_CONVERSION_NAMES.length
-    ? `${columnName} IN (${sqlInList(META_ADS_REVIEW_CONVERSION_NAMES)})`
+function buildMetaAdsIgnoredConversionSql(columnName) {
+  return META_ADS_IGNORED_CONVERSION_NAMES.length
+    ? `${columnName} IN (${sqlInList(META_ADS_IGNORED_CONVERSION_NAMES)})`
     : "FALSE";
+}
+
+function buildMetaAdsExcludedFromCoverageSql(columnName) {
+  return buildMetaAdsIgnoredConversionSql(columnName);
 }
 
 function buildMetaAdsConversionBucketSql(columnName) {
@@ -399,7 +405,9 @@ module.exports = {
   buildMetaIncrementalDateCheckpointSql,
   buildUnifiedCampaignMartIncrementalDateCheckpointSql,
   buildMetaAdsConversionBucketSql,
+  buildMetaAdsIgnoredConversionSql,
   buildMetaAdsExcludedFromCoverageSql,
   META_ADS_CONVERSION_AUDIT,
+  META_ADS_IGNORED_CONVERSION_NAMES,
   META_ADS_REVIEW_CONVERSION_NAMES
 };

@@ -12,7 +12,7 @@ config {
   type: "incremental",
   schema: dataform.projectConfig.vars.OUTPUTS_DATASET,
   tags: [dataform.projectConfig.vars.LABEL_EXECUTION_OPERATION, "performance", "campaigns", "mart"],
-  description: "Thin reporting mart over the normalized paid-media staging base. Exposes entity_grain/entity_id while keeping hybrid Ads plus GA4 metrics and preserving observed Ads detail.",
+  description: "Thin reporting mart over the normalized paid-media staging base. Exposes canonical entity_id/entity_name while keeping hybrid Ads plus GA4 metrics and preserving observed Ads detail.",
   bigquery: {
     partitionBy: "date",
     clusterBy: ["platform", "country_code", "campaign_id"]
@@ -52,13 +52,64 @@ pre_operations {
     )}
   );
   ${when(incremental(),
-    `DELETE FROM ${self()} WHERE date >= date_checkpoint`
+    `ALTER TABLE ${self()} ADD COLUMN IF NOT EXISTS ga4_event_identity_status STRING;
+     ALTER TABLE ${self()} ADD COLUMN IF NOT EXISTS ga4_events INT64;
+     BEGIN
+       ALTER TABLE ${self()} DROP COLUMN link_clicks;
+     EXCEPTION WHEN ERROR THEN
+       SET date_checkpoint = date_checkpoint;
+     END;
+     BEGIN
+       ALTER TABLE ${self()} DROP COLUMN meta_link_clicks;
+     EXCEPTION WHEN ERROR THEN
+       SET date_checkpoint = date_checkpoint;
+     END;
+     DELETE FROM ${self()} WHERE date >= date_checkpoint`
   )}
 }
 
 SELECT
   CURRENT_TIMESTAMP() AS _run_timestamp,
-  b.*,
+  b.date,
+  b.platform,
+  b.country_code,
+  b.account_id,
+  b.account_name,
+  b.campaign_id,
+  b.campaign_name,
+  b.ad_group_or_adset_id,
+  b.ad_group_or_adset_name,
+  b.ad_id,
+  b.ad_name,
+  b.is_pmax,
+  b.entity_id,
+  b.entity_name,
+  b.ga4_attribution_grain,
+  b.ga4_event_identity_status,
+  b.impressions,
+  b.clicks,
+  b.spend,
+  b.platform_conversions_form,
+  b.platform_conversions_call,
+  b.platform_conversions_crm,
+  b.platform_conversions_visita,
+  b.platform_conversions_no_gestionado,
+  b.platform_conversions_no_cualificado,
+  b.platform_conversions_cualificado_negativo,
+  b.platform_conversions_total,
+  b.platform_conversions_value,
+  b.ga4_sessions,
+  b.ga4_users,
+  b.ga4_engaged_sessions,
+  b.ga4_events,
+  b.ga4_conversions_cmb,
+  b.ga4_conversions_form,
+  b.ga4_conversions_c2c,
+  b.ga4_conversions_generate_lead,
+  b.ga4_page_views,
+  b.ga4_total_leads,
+  b.is_spend_without_sessions,
+  b.is_sessions_without_spend,
   SAFE_DIVIDE(b.clicks, NULLIF(b.impressions, 0)) AS ctr,
   SAFE_DIVIDE(b.spend, NULLIF(b.clicks, 0)) AS cpc,
   SAFE_DIVIDE(b.spend * 1000, NULLIF(b.impressions, 0)) AS cpm,
